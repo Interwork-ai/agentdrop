@@ -447,8 +447,8 @@ Releases up to 0.4.12 predate this file.
 
 ### Removed
 
-- The deploy kit for one managed container platform (`deploy/managed-platform/`, `deploy/pull-release.sh`) left the
-  repository: it only fitted that site. Compose hosts keep using `deploy/pull-deploy.sh`.
+- A site-specific deploy kit left the repository; it did not apply to other hosts. Compose hosts keep using
+  `deploy/pull-deploy.sh`.
 
 ### Fixed
 
@@ -489,15 +489,15 @@ Releases up to 0.4.12 predate this file.
 
 - Release quality policy `docs/QUALITY.md`: test layers, CI/release/deploy gates, key journeys, rollback criteria,
   a per-release acceptance checklist, regression-test and flaky-test rules, with the guides it follows.
-- Every deploy is accepted on the live server itself: `pnpm smoke:live <target>` signs in as fixed QA
-  accounts (`@qa_smoke_a`, `@qa_smoke_b`, created by `scripts/qa-provision.mjs`) and runs the key journeys there.
+- Every deploy is accepted on the live server itself: `pnpm smoke:live <target>` signs in as two fixed QA
+  accounts (created by `scripts/qa-provision.mjs`) and runs the key journeys there.
 
 ## [0.5.2] - 2026-09-29
 
 ### Fixed
 
 - The dashboard's composer no longer turns the whole page black on servers reached over plain http (such as an
-  internal address on port 3300): it used a browser function that exists only on https. "Send a drop", "Continue" and
+  intranet address): it used a browser function that exists only on https. "Send a drop", "Continue" and
   New handoff open normally again.
 - Star and Archive clicked right after opening a drop no longer fail silently with a version conflict.
 
@@ -608,8 +608,8 @@ Releases up to 0.4.12 predate this file.
 
 - Recipient summaries omit deprecated endpoint counts, so a new client connected to an older server does not
   mislabel receiving agents as people; explicit group membership and person-level read receipt counts remain.
-- Deployment readiness checks no longer accept a host proxy redirect as API health; managed-platform recovery
-  fails when PostgreSQL or the API does not start instead of reporting a container address as success.
+- Deployment readiness checks no longer accept a host proxy redirect as API health; recovery fails when PostgreSQL
+  or the API does not start instead of reporting a container address as success.
 
 ## [0.4.19] - 2026-09-25
 
@@ -682,8 +682,8 @@ Releases up to 0.4.12 predate this file.
 ### Changed
 
 - Container logs are capped at 3 × 10 MB per service (`compose.local.yaml`, `compose.production.yaml` and the
-  managed-platform `create.sh`); before, they grew without limit until the next deploy.
-- `deploy/pull-release.sh` removes old runtime releases after a successful deploy, keeping the three newest and
+  deploy kit of the time); before, they grew without limit until the next deploy.
+- The runtime-tarball deploy script removes old releases after a successful deploy, keeping the three newest and
   always the current and previous one (for `--rollback`).
 
 ## [0.4.17] - 2026-09-24
@@ -712,8 +712,8 @@ Releases up to 0.4.12 predate this file.
 
 ### Fixed
 
-- `deploy/pull-release.sh` gave the ~100 MB runtime download the API's 60-second cap and failed behind a slow
-  proxy; it now allows 30 minutes, fails only on a 2-minute stall, and resumes an interrupted transfer.
+- The runtime-tarball deploy script gave the ~100 MB download the API's 60-second cap and failed on a slow
+  link; it now allows 30 minutes, fails only on a 2-minute stall, and resumes an interrupted transfer.
 
 ## [0.4.16] - 2026-09-24
 
