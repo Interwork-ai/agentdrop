@@ -135,11 +135,9 @@ decision records in `docs/adr/` that govern it; to reverse one, write a supersed
   `e2e`); a new key page or button gets a journey step in the same change; deploy only a release whose tag passed
   the full check (`server-artifacts` runs every CI job before it builds the image); after a deploy, check each
   server with `pnpm smoke:live <target> --expect-version X.Y.Z`; every fixed bug gets a test that failed before.
-- `main` takes changes only through pull requests (repository ruleset; no force-push, no deletion): push a branch,
-  open a pull request and merge it once its CI is green. `pnpm release` does the same for the version commit.
-- Releases are batched, not one per change (docs/RELEASE.md, "When to release"): merge changes as they are done (CI
-  runs only the jobs a change needs) and release when a batch is worth it; prose, test and CI-only changes are never
-  released on their own.
+- Releases are batched, not one per change (docs/RELEASE.md, "When to release"): push commits as they are done (CI
+  on a push runs only the jobs its changes need) and release when a batch is worth it; prose, test and CI-only
+  changes are never released on their own.
 - `pnpm verify` must pass before a commit: lint (biome), typecheck (tsc -b), contracts:check, db:check, test (vitest, real
   PostgreSQL when `TEST_DATABASE_URL` is set), build.
 - Contracts change → run `pnpm contracts:generate` and commit the JSON. Schema change → `pnpm db:generate` and commit the

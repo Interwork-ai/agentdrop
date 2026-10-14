@@ -66,7 +66,7 @@ jobs:
         env:
           CI_FULL: ${{ inputs.full == true }}
           CI_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || steps.base.outputs.sha }}
-          CI_RELEASE_COMMIT: "${{ (github.event_name == 'push' && startsWith(github.event.head_commit.message, 'release: ')) || (github.event_name == 'pull_request' && startsWith(github.head_ref, 'release/')) }}"
+          CI_RELEASE_COMMIT: "${{ github.event_name == 'push' && startsWith(github.event.head_commit.message, 'release: ') }}"
         run: node scripts/ci-changes.mjs
 
   cli:

@@ -10,11 +10,6 @@ Releases up to 0.4.12 predate this file.
 
 ## [Unreleased]
 
-### Changed
-
-- `pnpm release` merges the version commit through a pull request (release/<tag>, squash) and tags the merged
-  commit, because `main` now accepts pull requests only; CI skips the release pull request's own run.
-
 ### Fixed
 
 - The server release workflow failed after pushing the image when the repository owner has capital letters

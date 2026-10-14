@@ -117,33 +117,8 @@ function main() {
   run('pnpm', [scope === 'cli' ? 'verify:cli' : 'verify']);
   run('git', ['add', '--', ...edits.keys()]);
   run('git', ['commit', '-m', `release: ${tag}`]);
-  // The default branch only takes pull requests (repository ruleset), so the version commit goes in through one:
-  // push it to release/<tag>, open and squash-merge the pull request, then tag the merged commit. CI skips a
-  // release commit's own run; the tag runs the full check.
-  const releaseBranch = `release/${tag}`;
-  run('git', ['push', 'origin', `HEAD:refs/heads/${releaseBranch}`]);
-  run('gh', [
-    'pr',
-    'create',
-    '--base',
-    branch,
-    '--head',
-    releaseBranch,
-    '--title',
-    `release: ${tag}`,
-    '--body',
-    `Version files and CHANGELOG for ${tag} (\`pnpm release\`).`,
-  ]);
-  run('gh', ['pr', 'merge', releaseBranch, '--squash', '--delete-branch', '--subject', `release: ${tag}`]);
-  run('git', ['fetch', 'origin', branch]);
-  // the merged commit must hold exactly what was verified; anything else merged meanwhile stops the release untagged
-  if (git('rev-parse', `origin/${branch}^{tree}`) !== git('rev-parse', 'HEAD^{tree}'))
-    throw new Error(
-      `${branch} on origin differs from the verified release commit (something else was merged); ${tag} was not tagged. Update ${branch}, then tag the release commit by hand after checking it.`,
-    );
-  run('git', ['reset', '--keep', `origin/${branch}`]);
   run('git', ['tag', '-a', tag, '-m', tag]);
-  run('git', ['push', 'origin', `refs/tags/${tag}`]);
+  run('git', ['push', '--atomic', 'origin', `HEAD:refs/heads/${branch}`, `refs/tags/${tag}`]);
   console.log(`Released ${scope} ${version} as ${tag}`);
 }
 

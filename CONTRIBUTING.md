@@ -32,12 +32,6 @@ decides what may be merged.
 - Database schema changed (`packages/db`): run `pnpm db:generate` and commit the SQL migration. Migrations are
   expand → migrate → contract, never destructive by default (ADR 0004).
 
-## Pull requests
-
-`main` accepts changes only through pull requests, for maintainers too; it cannot be force-pushed or deleted. Open
-the pull request from a branch (or your fork) and wait for the CI jobs it starts; they run only what the change
-touches.
-
 ## Commits and changelog
 
 - [Conventional Commits](https://www.conventionalcommits.org/) (`feat`, `fix`, `docs`, `test`, `refactor`, `ci`,
