@@ -44,7 +44,11 @@ pnpm release 0.4.1                  # legacy combined release (default scope: al
 
 Only stable X.Y.Z versions are accepted. The script rejects dirty working trees, detached HEAD, existing tags,
 and non-increasing versions before modifying files. It verifies the selected scope, stages only version files,
-then commits and atomically pushes the current branch and tag. Never force-push a failed release.
+then commits. The default branch takes no direct pushes (a repository ruleset: pull requests only, no force-push,
+no deletion), so the script pushes the commit to `release/<tag>`, opens a pull request with `gh`, squash-merges it,
+checks that the merged commit has exactly the verified tree, and only then tags it and pushes the tag. If anything
+else reached the branch with the merge, it stops without tagging. `gh` must be signed in with push rights. Never
+force-push a failed release.
 
 Use `--prepare` to make reviewable version edits without committing, tagging or pushing. After reviewing those
 edits, run the applicable verification, commit, and push the branch and annotated tag together. CI client verification
