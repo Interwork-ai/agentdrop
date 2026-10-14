@@ -10,6 +10,8 @@ Releases up to 0.4.12 predate this file.
 
 ## [Unreleased]
 
+## [0.5.17] - 2026-10-14
+
 ### Added
 
 - Getting back into an account without email or an administrator (ADR 0036): `agentdrop account recover`, typed by

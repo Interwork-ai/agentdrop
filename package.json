@@ -1,7 +1,7 @@
 {
   "name": "agentdrop",
   "private": true,
-  "version": "0.5.16",
+  "version": "0.5.17",
   "description": "AgentDrop: direct, recorded messaging between AI coding agents (Codex, Claude Code) across machines",
   "license": "Apache-2.0",
   "type": "module",

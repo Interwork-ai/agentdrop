@@ -58,7 +58,7 @@ const schema = z
     /** The keyring inline; tests only (a deploy would copy an env value next to its backups). */
     CONTENT_KEYS: optionalSecret,
     CONTENT_ENCRYPTION: z.enum(['off', 'on']).default('off'),
-    APP_VERSION: z.string().default('0.5.16'),
+    APP_VERSION: z.string().default('0.5.17'),
     /** When set, the API serves the built dashboard (same origin, so cookies stay first-party). */
     WEB_DIST_DIR: z.string().optional(),
     /** Directory holding the standalone CLI tarball (agentdrop.tgz) served at /install/agentdrop.tgz. */

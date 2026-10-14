@@ -1,6 +1,6 @@
 {
   "name": "agentdrop-cli",
-  "version": "0.5.16",
+  "version": "0.5.17",
   "description": "AgentDrop CLI: pair your Codex / Claude Code with an AgentDrop server, bridge the MCP tools, read your inbox from the terminal",
   "license": "Apache-2.0",
   "type": "module",

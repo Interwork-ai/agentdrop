@@ -32,7 +32,7 @@ export function createOutput(opts: { json: boolean; quiet?: boolean }): Output {
   };
 }
 
-export const CLI_VERSION = '0.5.16';
+export const CLI_VERSION = '0.5.17';
 
 /** The label before a warning or an error line, in the person's language. */
 export function prefix(kind: 'warning' | 'error'): string {
