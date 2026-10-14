@@ -13,6 +13,13 @@ updates:
     groups:
       minor-and-patch:
         update-types: [minor, patch]
+    ignore:
+      # The CLI runs on the user's Node; its types follow the oldest supported major (engines), not the newest.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+      # The i18n check parses sources with the TypeScript 5.x JavaScript API, which 7.x (Go) no longer has.
+      - dependency-name: typescript-api
+        update-types: ["version-update:semver-major"]
     commit-message:
       prefix: "chore(deps)"
   - package-ecosystem: github-actions

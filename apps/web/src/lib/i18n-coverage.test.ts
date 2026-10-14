@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
-import ts from 'typescript';
+// TypeScript 7's compiler (Go) has no JavaScript API; the source parser for this check stays on the 5.x API
+import ts from 'typescript-api';
 import { expect, it } from 'vitest';
 
 /*
