@@ -1,0 +1,241 @@
+import { z } from 'zod';
+
+/**
+ * Stable error codes. Every code has a fixed `next_action` hint for the **calling program or agent** (the MCP
+ * bridge passes it to the model): it names tools and fields, and anything only a person can do is phrased as
+ * "tell the user …". Human interfaces never show it; the dashboard maps `code` to its own sentence
+ * (`apps/web/src/lib/error-text.ts`). Error bodies never carry stack traces or secrets.
+ */
+export const ERROR_CODES = {
+  UNAUTHORIZED: {
+    status: 401,
+    retryable: false,
+    next_action:
+      'The credential is missing or expired. Do not retry; tell the user this agent needs to be paired again (`agentdrop endpoint add` in a terminal).',
+  },
+  FORBIDDEN: {
+    status: 403,
+    retryable: false,
+    next_action: 'The current identity is not allowed to do this. Do not retry with another identity.',
+  },
+  NOT_FOUND: {
+    status: 404,
+    retryable: false,
+    next_action:
+      'The object does not exist or is not visible to the current H. Re-run directory_lookup or list_drops.',
+  },
+  VALIDATION_FAILED: {
+    status: 400,
+    retryable: false,
+    next_action: 'Fix the listed fields and call again (reuse the same request_id for a send).',
+  },
+  PAYLOAD_TOO_LARGE: {
+    status: 413,
+    retryable: false,
+    next_action: 'Shorten the body/extensions or move content to an attachment.',
+  },
+  IDEMPOTENCY_CONFLICT: {
+    status: 409,
+    retryable: false,
+    next_action: 'This request_id was already used with different content. Use a new request_id.',
+  },
+  VERSION_CONFLICT: {
+    status: 409,
+    retryable: true,
+    next_action: 'Re-read the object to get the current version, then retry.',
+  },
+  NO_DELIVERY_ROUTE: {
+    status: 422,
+    retryable: false,
+    next_action:
+      'The recipient has no default receiving endpoint. Pick a published named entry from directory_lookup, or tell the user the recipient must set one; nothing was sent.',
+  },
+  PREFERRED_ROUTE_UNAVAILABLE: {
+    status: 422,
+    retryable: false,
+    next_action:
+      'Your remembered entry for this contact is no longer available. Choose a target explicitly; nothing was sent.',
+  },
+  ROUTE_UNAVAILABLE: {
+    status: 422,
+    retryable: false,
+    next_action: 'The named entry is revoked or not published to you. Re-run directory_lookup.',
+  },
+  GROUP_RECIPIENT_UNAVAILABLE: {
+    status: 422,
+    retryable: false,
+    next_action:
+      'An active member has no usable receiving endpoint. Nothing was sent; tell the user which member (see details) must fix their binding, or ask a group admin to.',
+  },
+  TOO_MANY_RECIPIENTS: {
+    status: 422,
+    retryable: false,
+    next_action: 'The expanded target set exceeds the limit. Split the send.',
+  },
+  AMBIGUOUS_TARGET: {
+    status: 422,
+    retryable: false,
+    next_action: 'Several candidates match. Ask the user to choose a stable id from the candidates list.',
+  },
+  NOT_A_CONTACT: {
+    status: 422,
+    retryable: false,
+    next_action:
+      'Only accepted contacts or shared groups can receive. Nothing was sent. With the user’s consent, send a contact request (contact_request), or tell the user to invite them in the dashboard.',
+  },
+  BLOCKED: { status: 422, retryable: false, next_action: 'Delivery is not possible to this target.' },
+  ATTACHMENT_NOT_READY: {
+    status: 422,
+    retryable: false,
+    next_action: 'Finish the upload (or re-upload) before referencing this attachment.',
+  },
+  ATTACHMENT_NOT_OWNED: {
+    status: 403,
+    retryable: false,
+    next_action: 'Only attachments uploaded by the current H can be sent.',
+  },
+  PATH_NOT_ALLOWED: {
+    status: 403,
+    retryable: false,
+    next_action:
+      'Nothing was uploaded. If the path is outside the allowed directories, tell the user to run `agentdrop allow-dir add <folder>` in a terminal (details.allow_command names the exact command when the bridge knows it), with the folder that holds the file, then try again. A sensitive-file match (keys, credentials, .env) cannot be allowed: tell the user it was refused. Never copy or move files to get around this.',
+  },
+  FILE_TOO_LARGE: {
+    status: 413,
+    retryable: false,
+    next_action: 'The file exceeds the per-file or per-drop limit.',
+  },
+  QUOTA_EXCEEDED: {
+    status: 413,
+    retryable: false,
+    next_action:
+      'Storage quota for this H is exhausted. Do not retry; tell the user to delete items from their own space (or unsent uploads) in the dashboard to free space.',
+  },
+  GROUP_STORAGE_FULL: {
+    status: 409,
+    retryable: false,
+    next_action:
+      "The group's file space would be exceeded by these attachments (details: group_id, used, limit, bytes). Do not retry; tell the user which group is full and that a group owner or admin can remove old files in the dashboard, or send without the files.",
+  },
+  FILE_REMOVED: {
+    status: 410,
+    retryable: false,
+    next_action:
+      'This file was removed after the drop was sent (a group admin freed space, or the owner deleted it). Do not retry; tell the user the file is no longer available.',
+  },
+  NEEDS_APPROVAL: {
+    status: 202,
+    retryable: false,
+    next_action:
+      'Nothing has been delivered yet. Give the user the approval URL; only a person can approve it. Do not resend.',
+  },
+  STALE_APPROVAL: {
+    status: 409,
+    retryable: false,
+    next_action: 'Targets changed since approval. Re-preview and approve again.',
+  },
+  APPROVAL_EXPIRED: {
+    status: 410,
+    retryable: false,
+    next_action: 'The approval expired. Send again to create a new approval.',
+  },
+  RESYNC_REQUIRED: {
+    status: 410,
+    retryable: true,
+    next_action: 'The cursor is stale. Drop the cursor and fetch a fresh page.',
+  },
+  ACCOUNT_SUSPENDED: {
+    status: 403,
+    retryable: false,
+    next_action:
+      'This account is suspended. Do not retry; tell the user to contact the operator of this server.',
+  },
+  SIGNUP_DISABLED: {
+    status: 403,
+    retryable: false,
+    next_action: 'Sign-up is closed on this server. Tell the user to ask the operator for an account.',
+  },
+  ENDPOINT_REVOKED: {
+    status: 401,
+    retryable: false,
+    next_action:
+      'This endpoint was revoked. Do not retry; tell the user to pair this agent again from the dashboard.',
+  },
+  AGENT_REQUIRED: {
+    status: 409,
+    retryable: false,
+    next_action:
+      'The account has no paired agent, so it cannot add contacts, create or join groups yet. Tell the user to pair an agent first.',
+  },
+  RATE_LIMITED: { status: 429, retryable: true, next_action: 'Wait and retry with the same request_id.' },
+  UPSTREAM_UNAVAILABLE: {
+    status: 503,
+    retryable: true,
+    next_action:
+      'The server is temporarily unavailable. Retry later with the same request_id; if it keeps failing, tell the user (they can run `agentdrop doctor` in a terminal).',
+  },
+  NETWORK_ERROR: {
+    status: 0,
+    retryable: true,
+    next_action: 'Result unknown. Query the request status with the same request_id before sending again.',
+  },
+  INTERNAL: {
+    status: 500,
+    retryable: true,
+    next_action:
+      'Retry later with the same request_id. If it persists, tell the user (they can run `agentdrop doctor` in a terminal).',
+  },
+} as const;
+
+export type ErrorCode = keyof typeof ERROR_CODES;
+export const errorCodeSchema = z.enum(Object.keys(ERROR_CODES) as [ErrorCode, ...ErrorCode[]]);
+
+export const apiErrorSchema = z.object({
+  code: errorCodeSchema,
+  message: z.string(),
+  next_action: z.string(),
+  retryable: z.boolean(),
+  details: z.record(z.string(), z.unknown()).optional(),
+});
+export type ApiError = z.infer<typeof apiErrorSchema>;
+
+export function describeError(
+  code: ErrorCode,
+  message?: string,
+  details?: Record<string, unknown>,
+): ApiError {
+  const def = ERROR_CODES[code];
+  return {
+    code,
+    message: message ?? code,
+    next_action: def.next_action,
+    retryable: def.retryable,
+    ...(details ? { details } : {}),
+  };
+}
+
+export function httpStatusFor(code: ErrorCode): number {
+  const s = ERROR_CODES[code].status;
+  return s === 0 ? 503 : s;
+}
+
+/** Thrown by domain use-cases; adapters translate to HTTP / MCP results. */
+export class AgentDropError extends Error {
+  readonly code: ErrorCode;
+  readonly details: Record<string, unknown> | undefined;
+  constructor(code: ErrorCode, message?: string, details?: Record<string, unknown>) {
+    super(message ?? code);
+    this.name = 'AgentDropError';
+    this.code = code;
+    this.details = details;
+  }
+  toApiError(): ApiError {
+    return describeError(this.code, this.message, this.details);
+  }
+  get status(): number {
+    return httpStatusFor(this.code);
+  }
+  get retryable(): boolean {
+    return ERROR_CODES[this.code].retryable;
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "name": "@agentdrop/worker",
+  "version": "0.5.16",
+  "private": true,
+  "type": "module",
+  "main": "./dist/main.js",
+  "scripts": {
+    "dev": "tsx watch --env-file-if-exists=../../.env src/main.ts",
+    "start": "node dist/main.js",
+    "typecheck": "tsc -b"
+  },
+  "dependencies": {
+    "@agentdrop/contracts": "workspace:*",
+    "@agentdrop/db": "workspace:*",
+    "@agentdrop/domain": "workspace:*",
+    "@agentdrop/storage": "workspace:*",
+    "drizzle-orm": "0.45.2",
+    "pino": "10.3.1",
+    "web-push": "3.6.7",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@types/web-push": "3.6.4"
+  }
+}

@@ -1,0 +1,1 @@
+ALTER TABLE "app_users" ADD COLUMN "notice_seen_state" jsonb;

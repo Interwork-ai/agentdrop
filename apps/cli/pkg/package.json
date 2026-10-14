@@ -1,0 +1,35 @@
+{
+  "name": "agentdrop-cli",
+  "version": "0.5.16",
+  "description": "AgentDrop CLI: pair your Codex / Claude Code with an AgentDrop server, bridge the MCP tools, read your inbox from the terminal",
+  "license": "Apache-2.0",
+  "type": "module",
+  "bin": {
+    "agentdrop": "bin/agentdrop.mjs"
+  },
+  "files": [
+    "bin",
+    "skill",
+    "claude-mod",
+    "README.md",
+    "THIRD_PARTY_NOTICES"
+  ],
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "keywords": [
+    "mcp",
+    "codex",
+    "claude-code",
+    "agent",
+    "messaging"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Interwork-ai/agentdrop.git"
+  },
+  "homepage": "https://github.com/Interwork-ai/agentdrop#readme",
+  "publishConfig": {
+    "access": "public"
+  }
+}

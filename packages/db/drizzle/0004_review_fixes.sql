@@ -1,0 +1,4 @@
+ALTER TABLE "approvals" ADD COLUMN "origin_kind" "origin_kind" DEFAULT 'mcp' NOT NULL;--> statement-breakpoint
+CREATE INDEX "deliveries_h_unread_idx" ON "deliveries" USING btree ("h_id") WHERE "deliveries"."read_at" is null and "deliveries"."archived_at" is null;--> statement-breakpoint
+ALTER TABLE "delivery_grants" ADD CONSTRAINT "delivery_grants_provenance_chk" CHECK (("delivery_grants"."kind" = 'direct' and "delivery_grants"."route_id" is not null and "delivery_grants"."group_id" is null and "delivery_grants"."membership_id" is null and "delivery_grants"."binding_id" is null)
+        or ("delivery_grants"."kind" = 'group' and "delivery_grants"."group_id" is not null and "delivery_grants"."membership_id" is not null and "delivery_grants"."binding_id" is not null and "delivery_grants"."route_id" is null));

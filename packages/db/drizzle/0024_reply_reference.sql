@@ -1,0 +1,3 @@
+ALTER TABLE "drops" ADD COLUMN "reply_to_drop_id" uuid;--> statement-breakpoint
+ALTER TABLE "drops" ADD CONSTRAINT "drops_reply_to_drop_id_drops_id_fk" FOREIGN KEY ("reply_to_drop_id") REFERENCES "public"."drops"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "drops_reply_to_idx" ON "drops" USING btree ("reply_to_drop_id","created_at") WHERE "drops"."reply_to_drop_id" is not null;

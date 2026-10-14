@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "drop_attachments_attachment_uq" ON "drop_attachments" USING btree ("attachment_id");

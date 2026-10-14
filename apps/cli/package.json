@@ -1,0 +1,38 @@
+{
+  "name": "@agentdrop/cli",
+  "version": "0.5.16",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "agentdrop": "./bin/agentdrop.js"
+  },
+  "main": "./dist/index.js",
+  "scripts": {
+    "typecheck": "tsc -b",
+    "agentdrop": "tsx src/main.ts",
+    "bundle": "node bundle.mjs",
+    "pack:standalone": "node bundle.mjs && node pack.mjs"
+  },
+  "dependencies": {
+    "@agentdrop/client": "workspace:*",
+    "@agentdrop/contracts": "workspace:*",
+    "@agentdrop/mcp": "workspace:*",
+    "@agentdrop/security": "workspace:*",
+    "@modelcontextprotocol/client": "2.0.0",
+    "commander": "15.0.0",
+    "jsonc-parser": "3.3.1",
+    "smol-toml": "1.8.0",
+    "undici": "7.30.0",
+    "zod": "4.6.5"
+  },
+  "files": [
+    "bin",
+    "dist",
+    "skill",
+    "claude-mod",
+    "README.md"
+  ],
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}

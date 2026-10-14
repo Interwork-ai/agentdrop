@@ -1,0 +1,101 @@
+# Full stack on one machine for trying AgentDrop (no TLS, filesystem storage, dev auth rules):
+#   echo "AUTH_SECRET=$(openssl rand -hex 32)" >> .env      # once; compose reads .env next to this file
+#   docker compose -f compose.local.yaml up -d --build
+#   open http://localhost:3000
+# Optional env: AGENTDROP_PORT (host port, default 3000), AGENTDROP_BIND (default 0.0.0.0), PUBLIC_BASE_URL
+#               (default http://localhost:3000), WEB_ORIGIN (optional second browser origin), TRUST_PROXY (default false),
+#               AUTH_SECRET (required, no default: a long random value that signs sessions; keep it across restarts).
+# Not for the public internet long-term: use compose.yaml + compose.production.yaml behind Caddy for that.
+# Container logs are capped (3 x 10 MB per service); they last until a deploy recreates the container.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  postgres:
+    image: postgres:17.6-alpine
+    environment:
+      POSTGRES_USER: agentdrop
+      POSTGRES_PASSWORD: agentdrop
+      POSTGRES_DB: agentdrop
+    volumes:
+      - pgdata_local:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agentdrop -d agentdrop"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  migrate:
+    logging: *logging
+    build: .
+    command: ["node", "packages/db/dist/migrate.js"]
+    environment:
+      DATABASE_URL: postgresql://agentdrop:agentdrop@postgres:5432/agentdrop
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    logging: *logging
+    build: .
+    environment:
+      NODE_ENV: development
+      HOST: 0.0.0.0
+      PORT: "3000"
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:3000}
+      # optional second browser origin that may log in and call the API (e.g. the same host on another port)
+      WEB_ORIGIN: ${WEB_ORIGIN:-}
+      # content encryption switch (docs/DEPLOY.md); the keyring comes from compose.keys.yaml
+      CONTENT_ENCRYPTION: ${CONTENT_ENCRYPTION:-off}
+      # initial sign-up mode (open|closed); an admin can change it at runtime from the dashboard
+      SIGNUP_MODE: ${SIGNUP_MODE:-open}
+      DATABASE_URL: postgresql://agentdrop:agentdrop@postgres:5432/agentdrop
+      AUTH_SECRET: ${AUTH_SECRET:?set AUTH_SECRET to a long random value (openssl rand -hex 32)}
+      WEB_PUSH_VAPID_PUBLIC_KEY: ${WEB_PUSH_VAPID_PUBLIC_KEY:-}
+      STORAGE_PROVIDER: fs
+      FS_STORAGE_DIR: /data/storage
+      WEB_DIST_DIR: /srv/apps/web/dist
+      CLI_DIST_DIR: /srv/apps/cli/pack
+      LOG_LEVEL: info
+      # set TRUST_PROXY=true when a reverse proxy (nginx/Caddy) terminates TLS in front of this port
+      TRUST_PROXY: ${TRUST_PROXY:-false}
+    volumes:
+      - storage_local:/data/storage
+    ports:
+      # AGENTDROP_BIND=127.0.0.1 keeps the plain-http port reachable only by a local reverse proxy
+      - "${AGENTDROP_BIND:-0.0.0.0}:${AGENTDROP_PORT:-3000}:3000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  worker:
+    logging: *logging
+    build: .
+    command: ["node", "apps/worker/dist/main.js"]
+    environment:
+      DATABASE_URL: postgresql://agentdrop:agentdrop@postgres:5432/agentdrop
+      STORAGE_PROVIDER: fs
+      FS_STORAGE_DIR: /data/storage
+      WEB_PUSH_VAPID_PUBLIC_KEY: ${WEB_PUSH_VAPID_PUBLIC_KEY:-}
+      WEB_PUSH_VAPID_PRIVATE_KEY: ${WEB_PUSH_VAPID_PRIVATE_KEY:-}
+      WEB_PUSH_VAPID_SUBJECT: ${WEB_PUSH_VAPID_SUBJECT:-}
+      # Link target in Feishu notices (docs/FEISHU.md).
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:3000}
+      WEB_ORIGIN: ${WEB_ORIGIN:-}
+      # content encryption switch (docs/DEPLOY.md); the keyring comes from compose.keys.yaml
+      CONTENT_ENCRYPTION: ${CONTENT_ENCRYPTION:-off}
+    volumes:
+      - storage_local:/data/storage
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+volumes:
+  pgdata_local:
+  storage_local:

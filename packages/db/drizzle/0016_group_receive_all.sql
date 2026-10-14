@@ -1,0 +1,1 @@
+ALTER TABLE "group_memberships" ADD COLUMN "receive_all" boolean DEFAULT false NOT NULL;

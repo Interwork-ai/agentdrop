@@ -1,0 +1,23 @@
+{
+  "name": "@agentdrop/mcp",
+  "version": "0.5.16",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b"
+  },
+  "dependencies": {
+    "@agentdrop/client": "workspace:*",
+    "@agentdrop/contracts": "workspace:*",
+    "@modelcontextprotocol/server": "2.0.0",
+    "zod": "4.6.5"
+  }
+}

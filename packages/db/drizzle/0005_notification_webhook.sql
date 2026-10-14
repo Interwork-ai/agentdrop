@@ -1,0 +1,1 @@
+ALTER TABLE "app_users" ADD COLUMN "notification_webhook_url" text;

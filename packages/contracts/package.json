@@ -1,0 +1,20 @@
+{
+  "name": "@agentdrop/contracts",
+  "version": "0.5.16",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b"
+  },
+  "dependencies": {
+    "zod": "4.6.5"
+  }
+}

@@ -1,0 +1,1 @@
+CREATE INDEX "drops_created_idx" ON "drops" USING btree ("created_at");

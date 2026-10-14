@@ -1,0 +1,13 @@
+# Secret scanning (gitleaks). The repository's tests hold fake credentials on purpose: they check that sensitive
+# files are refused and that secrets never reach logs. Those fixtures are allowlisted here; anything else is a find.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "test fixtures"
+paths = [
+  '''(^|/)[^/]+\.test\.ts$''',
+]
+regexes = [
+  '''AKIAABCDEFGHIJKLMNOP''', # hygiene-allow: secret the documented fake AWS key id the tests use
+]

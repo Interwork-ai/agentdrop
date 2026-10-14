@@ -1,0 +1,175 @@
+name: ci
+# Two depths (docs/QUALITY.md §3):
+#   - a push or pull request runs only the jobs its changes need (scripts/ci-changes.mjs): prose runs the
+#     public-hygiene check alone, the CLI checks run on the oldest supported Node, the browser journeys run when the
+#     dashboard, the API or what lies under them changed; a newer push to the same branch cancels the older run;
+#   - a release tag runs everything (server-artifacts.yml calls this workflow with `full: true` before it builds),
+#     and so does a manual run.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      full:
+        description: Run every job regardless of what changed
+        type: boolean
+        default: true
+  workflow_call:
+    inputs:
+      full:
+        type: boolean
+        default: true
+
+# Least privilege: CI only reads the repository.
+permissions:
+  contents: read
+
+concurrency:
+  # In a called run `github.workflow` is the caller's name, so a release check never cancels or waits on a branch
+  # run. Cancelling an older push loses nothing: the next run compares with the last green run, not the last push.
+  group: ci-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') && github.event_name != 'workflow_dispatch' }}
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read # the last green run on this branch, below
+    outputs:
+      verify: ${{ steps.plan.outputs.verify }}
+      cli: ${{ steps.plan.outputs.cli }}
+      e2e: ${{ steps.plan.outputs.e2e }}
+      cli_nodes: ${{ steps.plan.outputs.cli_nodes }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+      # generic rules only here: the private deny list stays on the maintainer's machine. Every run, prose included.
+      - run: node scripts/check-public-hygiene.mjs
+      # A push is compared with the head of the last green run on its branch (not the previous push, whose run may
+      # have been cancelled or failed). Release commits are passed over: their branch run checks nothing.
+      - id: base
+        if: github.event_name == 'push' && inputs.full != true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sha=$(gh run list -R "$GITHUB_REPOSITORY" --workflow ci.yml --branch "$GITHUB_REF_NAME" --event push \
+            --status success --limit 30 --json headSha,displayTitle \
+            -q '[.[] | select(.displayTitle | startswith("release: ") | not)][0].headSha // ""' || true)
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+      - id: plan
+        env:
+          CI_FULL: ${{ inputs.full == true }}
+          CI_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || steps.base.outputs.sha }}
+          CI_RELEASE_COMMIT: "${{ github.event_name == 'push' && startsWith(github.event.head_commit.message, 'release: ') }}"
+        run: node scripts/ci-changes.mjs
+
+  cli:
+    needs: changes
+    if: needs.changes.outputs.cli == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: ${{ fromJSON(needs.changes.outputs.cli_nodes) }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --filter agentdrop --filter @agentdrop/cli...
+      - run: pnpm verify:cli
+
+  verify:
+    needs: changes
+    if: needs.changes.outputs.verify == 'true'
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17.6-alpine
+        env:
+          POSTGRES_USER: agentdrop
+          POSTGRES_PASSWORD: agentdrop
+          POSTGRES_DB: agentdrop_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U agentdrop"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      TEST_DATABASE_URL: postgresql://agentdrop:agentdrop@localhost:5432/agentdrop_test
+      CI: "1"
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm contracts:check
+      - run: pnpm db:check
+      - run: pnpm test
+      - run: pnpm build
+      # diagnostics only: a full artifact quota must not turn a passing run red
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        continue-on-error: true
+        with:
+          name: test-results
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # The dashboard's key journeys in a real browser (scripts/e2e/run.mjs), in a secure context and on a plain-http
+  # origin, which is not a secure context. Unit and API tests once passed while "Send a drop" blanked the page on
+  # plain http.
+  e2e:
+    needs: changes
+    if: needs.changes.outputs.e2e == 'true'
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17.6-alpine
+        env:
+          POSTGRES_USER: agentdrop
+          POSTGRES_PASSWORD: agentdrop
+          POSTGRES_DB: agentdrop_e2e
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U agentdrop"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      E2E_DATABASE_URL: postgresql://agentdrop:agentdrop@localhost:5432/agentdrop_e2e
+      # The runner has 2 cores; the journeys mostly wait on the server and the browser, so run three at a time.
+      E2E_CONCURRENCY: "3"
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      # ubuntu-latest ships Google Chrome, which playwright-core drives directly (no browser download).
+      - run: pnpm e2e
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: failure()
+        continue-on-error: true
+        with:
+          name: e2e-screenshots
+          path: test-results/e2e/
+          if-no-files-found: ignore
+          retention-days: 7

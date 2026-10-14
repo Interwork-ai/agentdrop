@@ -1,0 +1,19 @@
+# Content encryption keyring (docs/plan/CONTENT_ENCRYPTION.md §14). Add after the other compose files:
+#   docker compose -f compose.local.yaml -f compose.keys.yaml …            (deploy/pull-deploy.sh does this itself
+#   docker compose -f compose.yaml -f compose.production.yaml -f compose.keys.yaml …   when the key file exists)
+# The key file stays on the host, owned by uid 1000 (the container user), mode 0400, outside the app directory,
+# its releases and backups, and is never put in an .env file. The switch CONTENT_ENCRYPTION=on is set where the
+# other settings live (.env.production for compose.production.yaml, the shell/.env.trial for compose.local.yaml), not
+# here: an `environment` entry in this file would override an env_file and silently keep it off.
+x-content-keys: &content-keys
+  environment:
+    CONTENT_KEYS_FILE: /run/secrets/content-keys.json
+  volumes:
+    - ${CONTENT_KEYS_HOST_FILE:-/etc/agentdrop/content-keys.json}:/run/secrets/content-keys.json:ro
+  # no core dumps: they would hold decrypted content and keys
+  ulimits:
+    core: 0
+
+services:
+  api: *content-keys
+  worker: *content-keys

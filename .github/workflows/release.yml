@@ -1,0 +1,70 @@
+name: release
+# Tag a commit as vX.Y.Z (pnpm release X.Y.Z does it) and this workflow:
+#   1. runs client verification without PostgreSQL or the server
+#   2. builds the standalone CLI package (agentdrop-cli, bin: agentdrop)
+#   3. attaches the tarball to a GitHub Release (usable with `npm i -g <asset url>` even without npm)
+#   4. publishes it to npm with provenance (trusted publishing when NPM_TRUSTED_PUBLISHING=true, else NPM_TOKEN)
+on:
+  push:
+    tags: ['v*.*.*']
+
+# Least privilege: nothing by default; the one job that publishes gets exactly what it needs.
+permissions: {}
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # GitHub Release with the tarball
+      id-token: write # npm trusted publishing (OIDC)
+    env:
+      CI: "1"
+      # exposed at job level so `if:` conditions can test whether the secret exists
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+      # npm only accepts provenance attestations from public repositories
+      PROVENANCE: ${{ github.event.repository.private && '--provenance=false' || '--provenance' }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+      - run: pnpm install --frozen-lockfile --filter agentdrop --filter @agentdrop/cli...
+      - run: pnpm verify:cli
+      - name: Check that the tag matches the package version
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          VER=$(node -p "require('./apps/cli/package.json').version")
+          if [ "$TAG" != "$VER" ]; then echo "tag v$TAG != apps/cli version $VER"; exit 1; fi
+      - name: Smoke-test the tarball
+        run: |
+          npm install -g --prefix "$RUNNER_TEMP/adtest" ./apps/cli/pack/agentdrop.tgz
+          "$RUNNER_TEMP/adtest/bin/agentdrop" --version
+          "$RUNNER_TEMP/adtest/bin/agentdrop" --help | grep -q setup
+          AGENTDROP_TEST_CLI_BIN="$RUNNER_TEMP/adtest/bin/agentdrop" pnpm exec vitest run --config vitest.cli.config.ts apps/cli/src/mcp.test.ts apps/cli/src/pending.test.ts
+      - name: GitHub Release with the tarball
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
+        with:
+          files: |
+            apps/cli/pack/agentdrop.tgz
+            apps/cli/pack/agentdrop-cli-*.tgz
+          generate_release_notes: true
+      # Route B: a granular token stored as the NPM_TOKEN secret.
+      - name: Publish to npm (token)
+        if: ${{ env.NPM_TOKEN != '' }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: cd apps/cli/pack/out && npm publish --access public $PROVENANCE
+      # Route A: npm "trusted publishing" (OIDC). Configure the package's Trusted Publisher on npmjs.com as
+      # repo Interwork-ai/agentdrop, workflow release.yml, then set the repository variable NPM_TRUSTED_PUBLISHING=true.
+      - name: Publish to npm (trusted publishing, no token)
+        if: ${{ env.NPM_TOKEN == '' && vars.NPM_TRUSTED_PUBLISHING == 'true' }}
+        run: |
+          npm install -g npm@latest
+          npm config delete //registry.npmjs.org/:_authToken || true
+          cd apps/cli/pack/out && npm publish --access public $PROVENANCE
+      - name: Note when npm publish was skipped
+        if: ${{ env.NPM_TOKEN == '' && vars.NPM_TRUSTED_PUBLISHING != 'true' }}
+        run: echo "no NPM_TOKEN secret and NPM_TRUSTED_PUBLISHING not set; skipped npm publish (GitHub Release still gets the tarball)"

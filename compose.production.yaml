@@ -1,0 +1,86 @@
+# Production overrides: docker compose --env-file .env.production -f compose.yaml -f compose.production.yaml up -d
+# Secrets come from .env.production (never committed). Images must be tagged by version, not :latest.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  postgres:
+    ports: !reset []     # remove the development host port; private network only
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.production}
+    restart: unless-stopped
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./backups:/backups
+
+  migrate:
+    logging: *logging
+    image: ${AGENTDROP_IMAGE:?set AGENTDROP_IMAGE, e.g. ghcr.io/interwork-ai/agentdrop/server:<version> or a digest}
+    build: .
+    command: ["node", "packages/db/dist/migrate.js"]
+    env_file: .env.production
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    logging: *logging
+    image: ${AGENTDROP_IMAGE:?set AGENTDROP_IMAGE, e.g. ghcr.io/interwork-ai/agentdrop/server:<version> or a digest}
+    build: .
+    env_file: .env.production
+    environment:
+      HOST: 0.0.0.0
+      PORT: "3000"
+      TRUST_PROXY: "true"
+      # The API only needs the browser-safe public key. Prevent secrets from the shared env file reaching it.
+      WEB_PUSH_VAPID_PRIVATE_KEY: ""
+      WEB_PUSH_VAPID_SUBJECT: ""
+      WEB_DIST_DIR: /srv/apps/web/dist
+      CLI_DIST_DIR: /srv/apps/cli/pack
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  worker:
+    logging: *logging
+    image: ${AGENTDROP_IMAGE:?set AGENTDROP_IMAGE, e.g. ghcr.io/interwork-ai/agentdrop/server:<version> or a digest}
+    build: .
+    command: ["node", "apps/worker/dist/main.js"]
+    env_file: .env.production
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  caddy:
+    logging: *logging
+    image: caddy:2.9-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      AGENTDROP_DOMAIN: ${AGENTDROP_DOMAIN:-drop.example.com}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

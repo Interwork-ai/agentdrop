@@ -1,0 +1,48 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+coverage/
+.vitest/
+playwright-report/
+test-results/
+.DS_Store
+/data/
+/tmp/
+*.log
+.turbo/
+apps/cli/bundle/
+apps/cli/pack/
+# personal agent and editor state never belongs to the repository (docs/PUBLIC_REPOSITORY.md)
+.claude/
+.codex/
+.cursor/
+.opencode/
+.idea/
+.vscode/
+# Claude Code writes type declarations beside a mod it loads with --plugin-dir
+apps/cli/claude-mod/agentdrop/.claude-plugin/types/
+apps/cli/claude-mod/agentdrop/tsconfig.json
+
+# Kept locally, never part of the repository (docs/PUBLIC_REPOSITORY.md §1): internal review notes, early planning
+# drafts, reference screenshots, third-party agent skills used as personal aids, local runtime data, per-host deploy
+# settings
+/vendor/
+/docs/REVIEW*.md
+/docs/FRONTEND_REVIEW.md
+/docs/CLIENT_SERVER_BOUNDARY.md
+/docs/design/
+/docs/plan/README.md
+/docs/plan/START_HERE.md
+/docs/plan/CHANGELOG.md
+/docs/plan/MIGRATION_V02.md
+/docs/plan/IMPLEMENTATION_TASKS.md
+/docs/plan/SOURCES.md
+/docs/plan/DASHBOARD.md
+/docs/plan/MCP_TOOL_DESIGN.md
+/docs/plan/RUNBOOK.md
+**/data/storage/
+apps/api/data/
+deploy/site.env

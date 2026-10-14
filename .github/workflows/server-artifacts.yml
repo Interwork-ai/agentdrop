@@ -1,0 +1,176 @@
+# Build the server once, in one place, and let every environment consume that exact build.
+#
+# Building on each host would take minutes per machine, give no guarantee that two servers run identical bytes,
+# and make a deploy depend on whatever is in a local checkout. CI produces one image and one runtime tarball from
+# the same build instead, and a deploy is a pull plus a restart.
+#
+# Two shapes because hosts differ, not because the build does:
+#   - image   → hosts that run docker compose (pull by digest, `deploy/pull-deploy.sh`)
+#   - tarball → hosts that cannot run containers: the image's /srv tree, run with plain Node.js
+#
+# Built for releases only, not for every push to main: a release tag (`vX.Y.Z` of a combined release, or
+# `server-vX.Y.Z`) or a manual run on the commit to deploy. The full CI check (ci.yml with `full: true`) runs first
+# and must pass; the image is built only from a commit that passed it. A CLI-only release (`pnpm release X.Y.Z
+# --scope cli`, which leaves the server's version alone) builds nothing here.
+name: server-artifacts
+
+on:
+  push:
+    tags: ['v*.*.*', 'server-v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: server-artifacts-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  IMAGE: ghcr.io/${{ github.repository }}/server
+
+jobs:
+  # A `v` tag also names CLI-only releases; build only when the server carries this version too.
+  scope:
+    runs-on: ubuntu-latest
+    outputs:
+      build: ${{ steps.scope.outputs.build }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - id: scope
+        run: |
+          build=true
+          case "$GITHUB_REF" in
+            refs/tags/v*)
+              server=$(node -p "require('./apps/api/package.json').version")
+              [ "v$server" = "$GITHUB_REF_NAME" ] || build=false
+              ;;
+          esac
+          echo "build=$build" | tee -a "$GITHUB_OUTPUT"
+
+  checks:
+    needs: scope
+    if: needs.scope.outputs.build == 'true'
+    uses: ./.github/workflows/ci.yml
+    with:
+      full: true
+    permissions:
+      contents: read
+      actions: read
+
+  build:
+    needs: checks
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+      image: ${{ env.IMAGE }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5.10.0
+        with:
+          images: ${{ env.IMAGE }}
+          labels: |
+            org.opencontainers.image.licenses=Apache-2.0
+          tags: |
+            type=sha,format=long,prefix=sha-
+            type=match,pattern=^(server-)?v(.*)$,group=2
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/') }}
+
+      - id: build
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # Reuse the dependency layer across runs: a source-only change should not reinstall node_modules.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false
+
+      # The same image, unpacked. A host runs the services with the extracted directory as its cwd (for example
+      # `node apps/api/dist/main.js`), so the archive must hold `apps/…` and `node_modules/…` at the top level —
+      # hence `-C /srv .` rather than archiving the path.
+      - name: Export the runtime tarball from the image just built
+        run: |
+          set -euo pipefail
+          ref="${IMAGE}@${{ steps.build.outputs.digest }}"
+          docker pull -q "$ref"
+          docker run --rm --entrypoint sh "$ref" -c 'tar -czf - -C /srv .' > runtime.tgz
+          sha256sum runtime.tgz | tee SHA256SUMS
+          echo "${{ github.sha }}" > COMMIT
+          echo "${{ steps.build.outputs.digest }}" > IMAGE_DIGEST
+          # Fail loudly rather than shipping an archive that would extract into the wrong shape. Listed to a
+          # file first: `tar | grep -q` makes grep close the pipe on its first match, and the resulting EPIPE
+          # in tar fails the whole pipeline under `pipefail` even though the check passed.
+          tar -tzf runtime.tgz > listing.txt
+          for required in ./apps/api/dist/main.js ./apps/worker/dist/main.js ./packages/db/dist/migrate.js; do
+            grep -qxF "$required" listing.txt || { echo "missing $required in runtime.tgz" >&2; exit 1; }
+          done
+          echo "entries: $(wc -l < listing.txt)"
+          ls -la runtime.tgz
+
+      # The image above is the release; the tarball is a convenience for hosts without containers. A full storage
+      # quota must not turn a good release red: the step warns instead, and such a host can export the same tree
+      # from the image (`docker run --rm --entrypoint sh <image@digest> -c 'tar -czf - -C /srv .'`).
+      - id: upload
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        continue-on-error: true
+        with:
+          name: runtime-${{ github.sha }}
+          path: |
+            runtime.tgz
+            SHA256SUMS
+            COMMIT
+            IMAGE_DIGEST
+          # a deploy takes it within days of the release, and a rollback uses the copy already on the host
+          retention-days: 7
+          compression-level: 0
+
+      - name: Warn when the tarball was not uploaded
+        if: steps.upload.outcome == 'failure'
+        run: echo "::warning title=runtime tarball not uploaded::The image was pushed, but the runtime-${{ github.sha }} artifact could not be uploaded (storage quota?). Export it from the image instead."
+
+      - name: Summary
+        run: |
+          {
+            echo "### Server artifacts"
+            echo
+            echo '```'
+            echo "image:  ${IMAGE}@${{ steps.build.outputs.digest }}"
+            echo "commit: ${{ github.sha }}"
+            echo '```'
+            echo
+            echo "Deploy a compose host:  \`deploy/pull-deploy.sh ${{ steps.build.outputs.digest }}\`"
+            echo "Host without containers:  download the \`runtime-${{ github.sha }}\` artifact."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # Only tagged server releases publish a GitHub Release, and only this small job may write to the repository;
+  # the build above stays read-only.
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/server-v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: runtime-${{ github.sha }}
+      - name: Attach the tarball to the release
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
+        with:
+          files: |
+            runtime.tgz
+            SHA256SUMS

@@ -1,0 +1,20 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "composite": false,
+    "incremental": false,
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@agentdrop/contracts": ["packages/contracts/src/index.ts"],
+      "@agentdrop/db": ["packages/db/src/index.ts"],
+      "@agentdrop/domain": ["packages/domain/src/index.ts"],
+      "@agentdrop/mcp": ["packages/mcp/src/index.ts"],
+      "@agentdrop/storage": ["packages/storage/src/index.ts"],
+      "@agentdrop/security": ["packages/security/src/index.ts"],
+      "@agentdrop/client": ["packages/client/src/index.ts"],
+      "@agentdrop/adapters": ["packages/adapters/src/index.ts"]
+    }
+  },
+  "include": ["vitest.config.ts", "packages/*/scripts/**/*.ts"]
+}

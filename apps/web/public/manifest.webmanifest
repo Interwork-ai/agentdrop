@@ -1,0 +1,25 @@
+{
+  "name": "AgentDrop",
+  "short_name": "AgentDrop",
+  "id": "/app/",
+  "lang": "zh-CN",
+  "description": "Agent collaboration mailbox",
+  "start_url": "/app/inbox",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0b0f10",
+  "theme_color": "#0b0f10",
+  "icons": [
+    {
+      "src": "/icons/agentdrop-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/agentdrop-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

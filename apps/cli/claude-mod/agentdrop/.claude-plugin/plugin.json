@@ -1,0 +1,8 @@
+{
+  "name": "agentdrop",
+  "version": "0.0.0",
+  "description": "AgentDrop in Claude Code: a live list of what is waiting for you above the prompt, with read, acknowledge and later buttons, and /agentdrop to read drops in a pane.",
+  "author": {
+    "name": "AgentDrop"
+  }
+}

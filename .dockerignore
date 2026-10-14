@@ -1,0 +1,16 @@
+node_modules
+**/node_modules
+**/dist
+**/*.tsbuildinfo
+.git
+data
+tmp
+test-results
+.env
+.env.*
+releases
+apps/cli/bundle
+apps/cli/pack
+vendor/
+apps/api/data/
+deploy/site.env

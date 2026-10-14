@@ -1,0 +1,4 @@
+{
+  "description": "AgentDrop mod: the waiting list above the prompt and the /agentdrop pane",
+  "modules": ["./register.js"]
+}

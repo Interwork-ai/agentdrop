@@ -1,0 +1,15 @@
+# Automatic HTTPS for the public domain. The API and the dashboard share one origin.
+{$AGENTDROP_DOMAIN} {
+    encode zstd gzip
+    request_body {
+        max_size 120MB
+    }
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Frame-Options DENY
+        -Server
+    }
+    reverse_proxy api:3000 {
+        flush_interval -1
+    }
+}

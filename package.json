@@ -1,0 +1,51 @@
+{
+  "name": "agentdrop",
+  "private": true,
+  "version": "0.5.16",
+  "description": "AgentDrop: direct, recorded messaging between AI coding agents (Codex, Claude Code) across machines",
+  "license": "Apache-2.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0",
+    "pnpm": ">=10"
+  },
+  "packageManager": "pnpm@10.30.3",
+  "scripts": {
+    "dev": "pnpm --filter @agentdrop/api dev",
+    "build": "tsc -b tsconfig.build.json && pnpm --filter @agentdrop/web build",
+    "clean": "rimraf -g 'apps/*/dist' 'packages/*/dist' 'apps/*/tsconfig.tsbuildinfo' 'packages/*/tsconfig.tsbuildinfo'",
+    "typecheck": "tsc -b tsconfig.build.json && pnpm --filter @agentdrop/web typecheck",
+    "lint": "biome check .",
+    "hygiene": "node scripts/check-public-hygiene.mjs",
+    "format": "biome format --write .",
+    "test": "vitest run",
+    "e2e": "node scripts/e2e/run.mjs",
+    "smoke:live": "node scripts/live-smoke.mjs",
+    "test:encrypted": "AGENTDROP_TEST_ENCRYPTION=on vitest run",
+    "test:watch": "vitest",
+    "contracts:generate": "tsx packages/contracts/scripts/generate.ts",
+    "contracts:check": "tsx packages/contracts/scripts/generate.ts --check",
+    "db:generate": "pnpm --filter @agentdrop/db generate",
+    "db:migrate": "pnpm --filter @agentdrop/db migrate",
+    "db:check": "bash packages/db/scripts/check-drift.sh",
+    "dev:web": "pnpm --filter @agentdrop/web dev",
+    "verify": "pnpm lint && pnpm hygiene && pnpm typecheck && pnpm contracts:check && pnpm db:check && pnpm test && pnpm test:encrypted && pnpm build",
+    "release": "node scripts/release.mjs",
+    "lint:cli": "biome check apps/cli packages/client packages/contracts packages/mcp packages/security scripts vitest.cli.config.ts",
+    "typecheck:cli": "tsc -b apps/cli",
+    "test:cli": "vitest run --config vitest.cli.config.ts",
+    "build:cli": "pnpm typecheck:cli && pnpm --filter @agentdrop/cli pack:standalone && node scripts/check-cli-boundary.mjs && node scripts/smoke-installed-skills.mjs",
+    "verify:cli": "pnpm lint:cli && pnpm typecheck:cli && pnpm contracts:check && pnpm test:cli && pnpm build:cli",
+    "build:server": "tsc -b apps/api apps/worker && pnpm --filter @agentdrop/web typecheck && pnpm --filter @agentdrop/web build"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.14",
+    "@modelcontextprotocol/client": "2.0.0",
+    "@types/node": "22.20.3",
+    "playwright-core": "1.63.0",
+    "rimraf": "6.1.2",
+    "tsx": "4.23.13",
+    "typescript": "5.9.3",
+    "vitest": "5.0.1"
+  }
+}

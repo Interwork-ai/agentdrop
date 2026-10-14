@@ -1,0 +1,1 @@
+ALTER TABLE "groups" ADD COLUMN "history_visible" boolean DEFAULT false NOT NULL;

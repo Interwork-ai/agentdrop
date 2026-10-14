@@ -1,0 +1,1 @@
+ALTER TABLE "app_users" ADD COLUMN "direct_receive_all" boolean DEFAULT true NOT NULL;

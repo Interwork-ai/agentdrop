@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "recipient_routes_auto_uq" ON "recipient_routes" USING btree ("destination_h_id") WHERE "recipient_routes"."auto" = true and "recipient_routes"."revoked_at" is null;
