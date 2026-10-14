@@ -5,8 +5,8 @@
 <h1 align="center">AgentDrop</h1>
 
 <p align="center">
-  <b>A shared mailbox for coding agents.</b><br />
-  Send results, files and context to a teammate — or pick them up on your next machine.
+  <b>From your agent to theirs.</b><br />
+  A new way to collaborate: send results, files and context between coding agents.
 </p>
 
 <p align="center">
@@ -24,7 +24,25 @@
   <a href="README.zh-CN.md">中文</a>
 </p>
 
+## Your agent did the work. Why are you still the messenger?
+
+Still copy-pasting agent outputs to your teammates—and watching them paste everything into their agents?
+Send the files. Explain the context. Repeat for the next task.
+
+**Meet AgentDrop. From your agent to theirs.**
+
+Ask your agent to send the result. Your teammate gets notified where they work, then asks their agent to pick it
+up. The files and explanation arrive together, ready for the next step.
+
+Works with **Codex CLI, Claude Code, opencode, Cursor and oh-my-pi**. Each person keeps their own account and
+sessions.
+
 ## See it in action
+
+```text
+Wang, in Codex:          “Send the ablation results, results.csv and notes.md to @alice.”
+Alice, in Claude Code:  “Read the ablation results from Wang.”
+```
 
 <p align="center">
   <a href="docs/images/agentdrop-demo.mp4">
@@ -37,35 +55,31 @@
   <a href="docs/demo/README.md">Demo details and reproduction</a>
 </p>
 
-AgentDrop connects **Codex CLI, Claude Code, opencode, Cursor and oh-my-pi** through a mailbox you can self-host.
-Ask your agent to send a result; the recipient asks theirs to read it. Each person keeps their own account and
-sessions, and you do not need to be online at the same time.
+## Built for the handoff
 
-## What you can do
+| Feature | What it means for your team |
+| --- | --- |
+| **Different agents. Same team.** | You use Codex. Your teammate uses Claude Code. Exchange work across agents and machines, right where each of you works. |
+| **Get notified. Stay in your flow.** | Notices fit into Codex sessions and turns. The Claude Code mod shows a live list above the prompt, with actions to read, acknowledge or leave a message for later. Pick up the handoff in your current agent. |
+| **Results, with context.** | Send files, results and the explanation together. Fewer “what's this file?” follow-ups. |
+| **People and groups.** | Hand work to one teammate, or share an update with a group of up to 20 people. |
+| **Ready when they are.** | Send when you're done. The message waits in their inbox until they're ready. You don't have to be online together. |
+| **Self-hosted. Yours to run.** | Run AgentDrop on your team's server. Manage accounts, storage and access yourself. |
 
-| When you want to… | Ask your agent… | What happens |
-| --- | --- | --- |
-| Share a result with a teammate | “Send the ablation results and notes.md to @wang.” | Wang can read the message and retrieve its attachments from their agent or the dashboard. |
-| Keep a group up to date | “Send the review notes to #release.” | The group receives one message with the files and context together. |
-| Move work between your own machines | “Put results.csv and these notes in my space.” | Pick them up from any of your paired agents. My space stays out of the inbox and sends no notices. |
+### The handoff comes to you
+
+In **Codex**, get notices when you start a session, submit a prompt or finish a turn. In **Claude Code**, the
+AgentDrop mod keeps new messages above your prompt: **Read**, **On it**, or **Later**. You can see who sent what
+and respond without switching to the dashboard. Optional browser push and Feishu notifications keep you in the
+loop when your agents are closed.
+
+The mod requires Claude Code 2.1.287 or later; older versions use a status line alongside session and turn notices.
+See [Agent clients](docs/HARNESSES.md) for each integration's notification behaviour and requirements.
 
 Direct messages go to accepted contacts or people in a shared group; group messages go to groups you belong to.
-The names above are examples.
-
-## Why AgentDrop
-
-- **Stay in your agent.** Send, read and reply through MCP. The CLI also works from a terminal, scripts or CI.
-- **People and groups.** Address a contact or a group of up to 20 people. Read, starred and archived state are shared
-  across your agents and the dashboard.
-- **Files with context.** Keep notes and attachments together. Agent uploads are limited to folders you allow;
-  sensitive filenames and paths, including `.env` and private-key files, are blocked.
-- **Notices where you work.** Receive session and turn notices, with a live inbox view in Claude Code. Optional
-  browser push and Feishu notices can reach you while your agents are offline.
-- **Your own server.** Run the API, dashboard, worker and PostgreSQL with Docker Compose. Store attachments on disk
-  or S3-compatible storage; optionally enable encryption at rest.
-
-Received messages are treated as untrusted data. Receiving a message does not execute it or download its files.
-Client-specific integrations and verification status are documented in [Agent clients](docs/HARNESSES.md).
+Agent uploads stay within folders you allow, and sensitive filenames and paths such as `.env` and private-key
+files are blocked. Received content is treated as untrusted data; receiving a message does not execute it or
+download its attachments.
 
 ## Quick start
 
@@ -116,7 +130,7 @@ with `compose.production.yaml` behind HTTPS. Configuration, storage, backups and
 
 ## A dashboard when you need one
 
-Browse messages, manage contacts and groups, use My space, and pair your agents in the browser. The dashboard
+Browse messages, manage contacts and groups, and pair your agents in the browser. The dashboard
 supports English and Chinese, with dark and light themes.
 
 <p align="center">

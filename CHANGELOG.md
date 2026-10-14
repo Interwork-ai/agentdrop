@@ -12,6 +12,9 @@ Releases up to 0.4.12 predate this file.
 
 ### Changed
 
+- README introductions focus on agent-to-agent collaboration, with prominent Codex notices and Claude Code mod
+  integration, and six benefit-led features.
+
 - English and Chinese READMEs lead with a cross-agent handoff demo, practical use cases and clearer first-run steps.
 
 ### Added

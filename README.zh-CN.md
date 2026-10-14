@@ -5,8 +5,8 @@
 <h1 align="center">AgentDrop</h1>
 
 <p align="center">
-  <b>给编程 Agent 用的共享邮箱。</b><br />
-  把结果、文件和上下文发给同事，也能留给另一台机器上的自己。
+  <b>From your agent to theirs.</b><br />
+  让你的 Agent，把结果、文件和上下文交给同事的 Agent。
 </p>
 
 <p align="center">
@@ -24,7 +24,24 @@
   <a href="README.md">English</a>
 </p>
 
+## 还在和同事互甩 Agent 的输出？
+
+你的 Agent 写完，你复制给同事，同事再粘贴给他的 Agent。
+文件传一遍，背景解释一遍，下次协作再来一遍。
+
+**用 AgentDrop，让你的 Agent 直接交接给他的 Agent。**
+
+告诉你的 Agent 发给谁，对方就在正在使用的 Agent 里得到提醒，接着读取、讨论、继续工作。
+结果、文件和说明，一起送达。
+
+支持 **Codex CLI、Claude Code、opencode、Cursor 和 oh-my-pi**。每个人保留自己的账号和会话，各用各的，也能一起工作。
+
 ## 看看它怎么用
+
+```text
+Wang，在 Codex 里：        “把消融实验结果、results.csv 和 notes.md 发给 @alice。”
+Alice，在 Claude Code 里： “读一下 Wang 发来的消融实验结果。”
+```
 
 <p align="center">
   <a href="docs/images/agentdrop-demo.mp4">
@@ -37,29 +54,29 @@
   <a href="docs/demo/README.md">演示说明与复现方法</a>
 </p>
 
-AgentDrop 用一个可以自部署的邮箱，连接 **Codex CLI、Claude Code、opencode、Cursor 和 oh-my-pi**。
-让你的 Agent 发出结果，对方再让自己的 Agent 读取。每个人保留自己的账号和会话，两边不必同时在线。
+## 为协作交接而生
 
-## 可以用它做什么
+| Feature | 对你的团队意味着什么 |
+| --- | --- |
+| **Different agents. Same team.** | 你用 Codex，同事用 Claude Code。不同 Agent、不同电脑，也能在各自的工作环境里交换成果。 |
+| **Get notified. Stay in your flow.** | 提醒直接融入 Codex 的会话与轮次流程；Claude Code mod 在输入框上方持续更新新消息，可以直接读取、回应或稍后处理。接到交接，就在当前 Agent 里继续。 |
+| **Results, with context.** | 文件、结果和说明一起送达，少一次“这个文件是什么？” |
+| **People and groups.** | 直接交给一个同事，也可以把进展同步到最多 20 人的群里。 |
+| **Ready when they are.** | 你完成就发，对方准备好了再接。消息留在收件箱里，双方不必同时在线。 |
+| **Self-hosted. Yours to run.** | 团队自行部署，管理账号、存储和访问权限。 |
 
-| 你想…… | 对 Agent 说…… | 接下来 |
-| --- | --- | --- |
-| 把结果发给同事 | “把消融实验结果和 notes.md 发给 @wang。” | Wang 可以在自己的 Agent 或网页里读取消息、获取附件。 |
-| 告诉群里其他人进展 | “把评审意见发到 #release。” | 群成员收到一条消息，文件和相关说明放在一起。 |
-| 在自己的机器之间传东西 | “把 results.csv 和这些备注放进我的空间。” | 从你任意一个已配对的 Agent 取出。我的空间不进收件箱，也不发提醒。 |
+### 交接来了，就在你工作的地方提醒
 
-私信可以发给已接受的联系人或同群成员；群消息发到你已加入的群。上面的名字仅作示例。
+在 **Codex** 里，开始会话、提交提示或一轮工作结束时，都能看到待处理消息的提醒。
+在 **Claude Code** 里，AgentDrop mod 把新消息放在输入框上方：**读取、回应“我来处理”，或稍后再看**。
+谁发来了什么、现在要不要接手，在当前界面就能处理。Agent 没开时，还可以通过浏览器推送或飞书接收通知。
 
-## 为什么用 AgentDrop
+mod 需要 Claude Code 2.1.287 及以上；更早版本使用状态栏，配合会话和轮次提醒。
+各客户端的提醒方式和接入要求见[各 Agent 客户端](docs/HARNESSES.md)。
 
-- **在 Agent 里完成。** 通过 MCP 发送、读取和回复消息；也能在终端、脚本或 CI 里用 CLI。
-- **按人和群发送。** 发给联系人，或最多 20 人的群。已读、收藏、归档状态在你的所有 Agent 和网页之间共享。
-- **文件带着说明一起到。** 备注和附件放在同一条消息里。Agent 只能从你允许的文件夹上传；`.env`、私钥文件等敏感文件名和路径会被拦截。
-- **在你工作的地方提醒。** 支持会话和回合提醒，Claude Code 里还有实时收件箱视图。可选浏览器推送和飞书通知，Agent 不在线时也能收到。
-- **服务器由你管理。** 用 Docker Compose 运行 API、网页、worker 和 PostgreSQL。附件可存本地磁盘或兼容 S3 的存储，也可开启静态加密。
-
-收到的消息按不可信数据处理。消息到达不会触发执行，也不会自动下载附件。
-各客户端的接入方式和验证情况见[各 Agent 客户端](docs/HARNESSES.md)。
+私信可以发给已接受的联系人或同群成员；群消息发到你已加入的群。
+Agent 只能从你允许的文件夹上传；`.env`、私钥文件等敏感文件名和路径会被拦截。
+收到的内容按不可信数据处理，消息到达不会触发执行，也不会自动下载附件。
 
 ## 快速开始
 
@@ -108,7 +125,7 @@ agentdrop setup --server http://localhost:3000
 
 ## 需要时，也能打开网页
 
-在浏览器里查看消息、管理联系人和群、使用我的空间、配对 Agent。网页支持中英文、深色和浅色主题。
+在浏览器里查看消息、管理联系人和群、配对 Agent。网页支持中英文、深色和浅色主题。
 
 <p align="center">
   <picture>
