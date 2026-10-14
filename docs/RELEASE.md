@@ -44,7 +44,8 @@ pnpm release 0.4.1                  # legacy combined release (default scope: al
 
 Only stable X.Y.Z versions are accepted. The script rejects dirty working trees, detached HEAD, existing tags,
 and non-increasing versions before modifying files. It verifies the selected scope, stages only version files,
-then commits and atomically pushes the current branch and tag. Never force-push a failed release.
+then commits and atomically pushes the current branch and tag. `main` refuses force-pushes and deletion (a
+repository ruleset). Never force-push a failed release.
 
 Use `--prepare` to make reviewable version edits without committing, tagging or pushing. After reviewing those
 edits, run the applicable verification, commit, and push the branch and annotated tag together. CI client verification
