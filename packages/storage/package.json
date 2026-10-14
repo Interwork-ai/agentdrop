@@ -16,7 +16,7 @@
   },
   "dependencies": {
     "@agentdrop/contracts": "workspace:*",
-    "@aws-sdk/client-s3": "3.1134.0",
-    "@aws-sdk/lib-storage": "3.1134.0"
+    "@aws-sdk/client-s3": "3.1147.0",
+    "@aws-sdk/lib-storage": "3.1147.0"
   }
 }
