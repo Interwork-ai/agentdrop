@@ -105,6 +105,8 @@ jobs:
       - name: Export the runtime tarball from the image just built
         run: |
           set -euo pipefail
+          # docker references must be lowercase; the owner name may not be (metadata-action lowercases the tags)
+          IMAGE="${IMAGE,,}"
           ref="${IMAGE}@${{ steps.build.outputs.digest }}"
           docker pull -q "$ref"
           docker run --rm --entrypoint sh "$ref" -c 'tar -czf - -C /srv .' > runtime.tgz
@@ -148,7 +150,7 @@ jobs:
             echo "### Server artifacts"
             echo
             echo '```'
-            echo "image:  ${IMAGE}@${{ steps.build.outputs.digest }}"
+            echo "image:  ${IMAGE,,}@${{ steps.build.outputs.digest }}"
             echo "commit: ${{ github.sha }}"
             echo '```'
             echo

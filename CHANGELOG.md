@@ -10,6 +10,11 @@ Releases up to 0.4.12 predate this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- The server release workflow failed after pushing the image when the repository owner has capital letters
+  (`Interwork-ai`): image references are now lowercased before the runtime tarball is exported.
+
 ## [0.5.17] - 2026-10-14
 
 ### Added
