@@ -1,0 +1,148 @@
+{
+  "product": "AgentDrop",
+  "demo": false,
+  "style": "repo",
+  "scope": {
+    "versions": "current checkout",
+    "platforms": ["agent conversations", "web dashboard"]
+  },
+  "width": 1920,
+  "height": 1080,
+  "fps": 24,
+  "duration": 34,
+  "audioRequired": true,
+  "sfxRequired": true,
+  "typography": {
+    "mode": "english",
+    "enFont": "Manrope",
+    "zhStyle": "sans-serif",
+    "exceptionReason": "User requested an English README demo."
+  },
+  "shots": [
+    {
+      "id": "intro",
+      "start": 0,
+      "end": 4,
+      "type": "title",
+      "headlineEn": "Your agent's work. In their inbox.",
+      "claim": false,
+      "actions": [],
+      "headline": "Your agent's work. In their inbox.",
+      "description": "Your agent's work. In their inbox.",
+      "plainExplanation": "Your agent's work. In their inbox."
+    },
+    {
+      "id": "send",
+      "start": 4,
+      "end": 12,
+      "type": "detail",
+      "headlineEn": "Send the result, with its context.",
+      "claim": true,
+      "source": ["../../docs/USER_GUIDE.md"],
+      "actions": [
+        {
+          "id": "delivered",
+          "at": 4,
+          "action": "Delivered confirmation",
+          "soundRequired": true
+        }
+      ],
+      "headline": "Send the result, with its context.",
+      "description": "Send the result, with its context.",
+      "plainExplanation": "Send the result, with its context.",
+      "component": "main.tsx#Conversation"
+    },
+    {
+      "id": "receive",
+      "start": 12,
+      "end": 20,
+      "type": "detail",
+      "headlineEn": "Pick it up in another agent.",
+      "claim": true,
+      "source": ["../../docs/HARNESSES.md"],
+      "actions": [
+        {
+          "id": "received",
+          "at": 3,
+          "action": "Requested message shown",
+          "soundRequired": true
+        }
+      ],
+      "headline": "Pick it up in another agent.",
+      "description": "Pick it up in another agent.",
+      "plainExplanation": "Pick it up in another agent.",
+      "component": "main.tsx#Conversation"
+    },
+    {
+      "id": "dashboard",
+      "start": 20,
+      "end": 29,
+      "type": "detail",
+      "headlineEn": "The same message. A shared view.",
+      "claim": true,
+      "source": ["../../apps/web/src/pages/mailbox.tsx"],
+      "component": "../../apps/web/src/pages/mailbox.tsx",
+      "actions": [
+        {
+          "id": "open-message",
+          "at": 2,
+          "action": "Open message in real mailbox component",
+          "soundRequired": true
+        }
+      ],
+      "headline": "The same message. A shared view.",
+      "description": "The same message. A shared view.",
+      "plainExplanation": "The same message. A shared view."
+    },
+    {
+      "id": "close",
+      "start": 29,
+      "end": 34,
+      "type": "end",
+      "headlineEn": "Keep the work moving.",
+      "claim": false,
+      "actions": [],
+      "headline": "Keep the work moving.",
+      "description": "Keep the work moving.",
+      "plainExplanation": "Keep the work moving."
+    }
+  ],
+  "audio": {
+    "music": {
+      "file": "../../tmp/readme-demo/music.wav",
+      "gain": 0.5
+    },
+    "ducking": {
+      "enabled": true
+    },
+    "cues": [
+      {
+        "at": 7.975,
+        "syncOffset": 0.025,
+        "actionId": "delivered",
+        "file": "../../tmp/readme-demo/delivered.wav",
+        "gain": 1,
+        "role": "sfx",
+        "kind": "success"
+      },
+      {
+        "at": 14.975,
+        "syncOffset": 0.025,
+        "actionId": "received",
+        "file": "../../tmp/readme-demo/received.wav",
+        "gain": 1,
+        "role": "sfx",
+        "kind": "success"
+      },
+      {
+        "at": 21.977,
+        "syncOffset": 0.023,
+        "actionId": "open-message",
+        "file": "../../tmp/readme-demo/open-message.wav",
+        "gain": 1,
+        "role": "sfx",
+        "kind": "success"
+      }
+    ]
+  }
+}

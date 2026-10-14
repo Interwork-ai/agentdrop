@@ -1,0 +1,336 @@
+@import "../../apps/web/src/index.css";
+@source "../../apps/web/src";
+@source "./";
+html,
+body,
+#root {
+  margin: 0;
+  width: 1920px;
+  height: 1080px;
+  overflow: hidden;
+}
+* {
+  box-sizing: border-box;
+}
+.film {
+  width: 1920px;
+  height: 1080px;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  position: relative;
+  font-family: var(--font-sans);
+}
+.brand {
+  position: absolute;
+  top: 48px;
+  left: 100px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 28px;
+}
+.brand img {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+}
+.brand span {
+  font-size: 22px;
+  color: var(--color-muted);
+  margin-left: 18px;
+}
+.chapters {
+  position: absolute;
+  top: 60px;
+  right: 100px;
+  display: flex;
+  gap: 28px;
+  font-size: 18px;
+}
+.chapters span {
+  color: var(--color-dim);
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.chapters i {
+  font-style: normal;
+  font-family: var(--font-mono);
+  font-size: 14px;
+}
+.chapters .active {
+  color: var(--color-accent);
+}
+.scene {
+  position: absolute;
+  inset: 170px 100px 85px;
+}
+.eyebrow {
+  font-size: 20px;
+  letter-spacing: 0.12em;
+  color: var(--color-accent);
+  margin-bottom: 20px;
+  font-weight: 600;
+}
+.scene > h1 {
+  font-size: 88px;
+  line-height: 1.1;
+  letter-spacing: -0.045em;
+  font-weight: 650;
+  margin: 0;
+}
+.scene > h1 em {
+  color: var(--color-accent);
+  font-style: normal;
+}
+.scene > h2 {
+  font-size: 60px;
+  line-height: 1.15;
+  letter-spacing: -0.035em;
+  font-weight: 650;
+  margin: 0;
+}
+.subtitle {
+  font-size: 30px;
+  line-height: 1.55;
+  color: var(--color-muted);
+  margin: 20px 0 0;
+}
+.handoff {
+  display: flex;
+  align-items: center;
+  margin-top: 65px;
+  width: 1390px;
+}
+.handoff > div:not(.delivery-line) {
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  gap: 6px 18px;
+  padding: 30px;
+  border: 1px solid var(--color-line-strong);
+  border-radius: 18px;
+  width: 330px;
+  background: var(--color-surface);
+}
+.handoff svg {
+  width: 32px;
+  height: 32px;
+  grid-row: span 2;
+  color: var(--color-accent);
+}
+.handoff b {
+  font-size: 27px;
+}
+.handoff span {
+  font-size: 23px;
+  color: var(--color-muted);
+}
+.delivery-line {
+  flex: 1;
+  text-align: center;
+  position: relative;
+  margin: 0 32px;
+}
+.delivery-line span {
+  font-family: var(--font-mono);
+  font-size: 21px;
+}
+.delivery-line i {
+  display: block;
+  height: 2px;
+  background: var(--color-accent);
+  margin-top: 20px;
+}
+.delivery-line i::after {
+  content: "";
+  display: block;
+  position: absolute;
+  right: 0;
+  bottom: -5px;
+  width: 12px;
+  height: 12px;
+  border-top: 2px solid var(--color-accent);
+  border-right: 2px solid var(--color-accent);
+  transform: rotate(45deg);
+}
+.conversation {
+  width: 1530px;
+  margin-top: 44px;
+  border: 1px solid var(--color-line-strong);
+  background: var(--color-surface);
+  border-radius: 18px;
+  overflow: hidden;
+}
+.terminal-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  height: 68px;
+  padding: 0 32px;
+  font-size: 24px;
+  background: var(--color-surface-2);
+  border-bottom: 1px solid var(--color-line);
+}
+.terminal-bar span {
+  color: var(--color-muted);
+}
+.terminal-bar small {
+  margin-left: auto;
+  font-size: 18px;
+  color: var(--color-dim);
+}
+.terminal-body {
+  padding: 36px 38px;
+  min-height: 440px;
+  font-family: var(--font-mono);
+}
+.prompt {
+  display: flex;
+  gap: 20px;
+  font-size: 30px;
+  line-height: 1.7;
+}
+.prompt p {
+  margin: 0;
+  max-width: 1350px;
+}
+.prompt-arrow,
+.caret {
+  color: var(--color-accent);
+}
+.answer {
+  margin: 30px 0 0 40px;
+  font-size: 27px;
+  line-height: 1.65;
+  max-width: 1250px;
+}
+.answer-title {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  color: var(--color-accent);
+}
+.answer p {
+  margin: 16px 0;
+  color: var(--color-fg-2);
+}
+.files {
+  display: flex;
+  gap: 18px;
+  margin-top: 22px;
+}
+.files span {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--color-line-strong);
+  background: var(--color-surface-2);
+  border-radius: 10px;
+  padding: 10px 18px;
+  font-size: 24px;
+}
+.files svg {
+  color: var(--color-accent);
+}
+.download-note {
+  font-size: 22px;
+  color: var(--color-muted);
+  margin-top: 23px;
+}
+.dashboard.scene {
+  top: 145px;
+}
+.dashboard .eyebrow {
+  margin-bottom: 12px;
+}
+.dashboard .subtitle {
+  margin-top: 10px;
+}
+.dashboard-frame {
+  width: 1717px;
+  height: 679px;
+  margin-top: 27px;
+  border: 1px solid var(--color-line-strong);
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--color-surface);
+}
+.dashboard-scale {
+  width: 1072px;
+  height: 424px;
+  transform: scale(1.6);
+  transform-origin: top left;
+}
+.demo-dashboard {
+  width: 100%;
+  height: 100%;
+}
+.demo-dashboard *,
+.demo-dashboard *::before,
+.demo-dashboard *::after {
+  /* biome-ignore lint/complexity/noImportantStyles: export time owns product animation. */
+  animation: none !important;
+  /* biome-ignore lint/complexity/noImportantStyles: export time owns product transitions. */
+  transition: none !important;
+}
+.close.scene {
+  text-align: center;
+  top: 205px;
+}
+.close-logo {
+  width: 110px;
+  height: 110px;
+  border-radius: 24px;
+  margin: 0 auto 28px;
+}
+.close h1 {
+  font-size: 76px;
+}
+.install {
+  display: inline-block;
+  margin-top: 40px;
+  padding: 24px 36px;
+  border: 1px solid var(--color-line-strong);
+  border-radius: 14px;
+  background: var(--color-surface);
+  font-family: var(--font-mono);
+  font-size: 30px;
+  color: var(--color-accent);
+}
+.clients {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 19px;
+  margin-top: 38px;
+  font-size: 24px;
+  color: var(--color-fg-2);
+}
+.clients i {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--color-dim);
+}
+.repo {
+  margin-top: 28px;
+  font-size: 24px;
+  color: var(--color-muted);
+}
+.film footer {
+  position: absolute;
+  bottom: 31px;
+  left: 100px;
+  right: 100px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 18px;
+  color: var(--color-dim);
+}
+.progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  background: var(--color-accent);
+}

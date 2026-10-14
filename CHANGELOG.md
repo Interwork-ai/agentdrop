@@ -10,6 +10,15 @@ Releases up to 0.4.12 predate this file.
 
 ## [Unreleased]
 
+### Changed
+
+- English and Chinese READMEs lead with a cross-agent handoff demo, practical use cases and clearer first-run steps.
+
+### Added
+
+- A README animation and standalone demo video, with a reproducible rendering project using the real inbox
+  components and fictional data.
+
 ### Fixed
 
 - The server release workflow failed after pushing the image when the repository owner has capital letters
