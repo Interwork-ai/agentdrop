@@ -2,6 +2,8 @@
 
 [Watch or download the video](../images/agentdrop-demo.mp4) · [README animation](../images/agentdrop-demo.gif)
 
+For a shorter, problem-first social edit, see the [15-second demo](../social-demo/README.md).
+
 A 34-second English walkthrough: Wang asks Codex CLI to send the ablation results to Alice; Alice asks Claude Code
 to read them; the same message and its two attachments appear in the web inbox. The GIF is a shorter, silent loop.
 

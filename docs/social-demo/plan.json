@@ -1,0 +1,178 @@
+{
+  "product": "AgentDrop",
+  "demo": false,
+  "style": "repo",
+  "scope": {
+    "versions": "current checkout",
+    "platforms": [
+      "illustrated Codex CLI conversation",
+      "illustrated Claude Code conversation",
+      "web dashboard"
+    ]
+  },
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "duration": 15,
+  "audioRequired": true,
+  "sfxRequired": true,
+  "typography": {
+    "mode": "english",
+    "enFont": "Manrope",
+    "zhStyle": "sans-serif",
+    "exceptionReason": "The requested social-video brief specifies English captions for X."
+  },
+  "shots": [
+    {
+      "id": "hook",
+      "start": 0,
+      "end": 2,
+      "type": "title",
+      "headlineEn": "Humans are still the API between AI agents.",
+      "claim": false,
+      "actions": [],
+      "headline": "Humans are still the API between AI agents.",
+      "description": "Humans are still the API between AI agents.",
+      "plainExplanation": "Humans are still the API between AI agents."
+    },
+    {
+      "id": "send",
+      "start": 2,
+      "end": 6,
+      "type": "detail",
+      "headlineEn": "Send it to Alice.",
+      "claim": true,
+      "source": ["../../docs/USER_GUIDE.md"],
+      "actions": [
+        {
+          "id": "delivered",
+          "at": 2.1,
+          "action": "Delivered confirmation",
+          "soundRequired": true
+        }
+      ],
+      "headline": "Send it to Alice.",
+      "description": "Send it to Alice.",
+      "plainExplanation": "Send it to Alice.",
+      "component": "main.tsx"
+    },
+    {
+      "id": "receive",
+      "start": 6,
+      "end": 10,
+      "type": "detail",
+      "headlineEn": "Pick it up in Claude.",
+      "claim": true,
+      "source": ["../../docs/HARNESSES.md"],
+      "actions": [
+        {
+          "id": "received",
+          "at": 1.5,
+          "action": "Requested message shown",
+          "soundRequired": true
+        }
+      ],
+      "headline": "Pick it up in Claude.",
+      "description": "Pick it up in Claude.",
+      "plainExplanation": "Pick it up in Claude.",
+      "component": "main.tsx"
+    },
+    {
+      "id": "dashboard",
+      "start": 10,
+      "end": 13,
+      "type": "detail",
+      "headlineEn": "Files + context, together.",
+      "claim": true,
+      "source": ["../../apps/web/src/pages/mailbox.tsx"],
+      "component": "../../apps/web/src/pages/mailbox.tsx",
+      "actions": [
+        {
+          "id": "open-message",
+          "at": 0.5,
+          "action": "Open message in real mailbox component",
+          "soundRequired": true
+        }
+      ],
+      "headline": "Files + context, together.",
+      "description": "Files + context, together.",
+      "plainExplanation": "Files + context, together."
+    },
+    {
+      "id": "close",
+      "start": 13,
+      "end": 15,
+      "type": "end",
+      "headlineEn": "From your agent to theirs.",
+      "claim": false,
+      "actions": [],
+      "headline": "From your agent to theirs.",
+      "description": "From your agent to theirs.",
+      "plainExplanation": "From your agent to theirs."
+    }
+  ],
+  "audio": {
+    "music": {
+      "file": "../../tmp/social-demo/music.wav",
+      "gain": 0.5
+    },
+    "ducking": {
+      "enabled": true
+    },
+    "cues": [
+      {
+        "at": 4.074999999999999,
+        "syncOffset": 0.025,
+        "actionId": "delivered",
+        "file": "../../tmp/social-demo/delivered.wav",
+        "gain": 1,
+        "role": "sfx",
+        "kind": "success"
+      },
+      {
+        "at": 7.475,
+        "syncOffset": 0.025,
+        "actionId": "received",
+        "file": "../../tmp/social-demo/received.wav",
+        "gain": 1,
+        "role": "sfx",
+        "kind": "success"
+      },
+      {
+        "at": 10.477,
+        "syncOffset": 0.023,
+        "actionId": "open-message",
+        "file": "../../tmp/social-demo/open-message.wav",
+        "gain": 1,
+        "role": "sfx",
+        "kind": "success"
+      }
+    ],
+    "score": {
+      "tempoBpm": 120,
+      "chordChanges": [
+        {
+          "at": 0,
+          "frequencies": [146.832, 174.614, 220]
+        },
+        {
+          "at": 2,
+          "frequencies": [174.614, 220, 261.626]
+        },
+        {
+          "at": 6,
+          "frequencies": [116.541, 146.832, 174.614]
+        },
+        {
+          "at": 10,
+          "frequencies": [130.813, 164.814, 195.998]
+        },
+        {
+          "at": 13,
+          "frequencies": [174.614, 220, 261.626]
+        }
+      ]
+    }
+  },
+  "output": "../images/agentdrop-social.mp4"
+}

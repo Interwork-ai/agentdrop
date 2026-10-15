@@ -1,13 +1,15 @@
 """Synthesize and mix the original demo score with Python's stdlib and FFmpeg.
 
 Run from any directory: python3 docs/demo/audio.py
-All paths in the evidence file are relative to docs/demo, matching plan.json.
+Use --plan and --output to score another demo. Evidence paths are relative to the plan.
 """
 
+import argparse
 import array
 import hashlib
 import json
 import math
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -93,7 +95,41 @@ def loudness(path):
 
 
 def asset(name):
-    return {"file": f"../../tmp/readme-demo/{name}", "sha256": digest(OUT / name)}
+    return {"file": relative_asset(name), "sha256": digest(OUT / name)}
+
+
+def relative_asset(name):
+    return Path(os.path.relpath(OUT / name, PLAN.parent)).as_posix()
+
+
+def planned_score(samples, length, score):
+    """Change harmony at editorial boundaries, with an optional beat grid."""
+    tempo = float(score["tempoBpm"])
+    changes = score["chordChanges"]
+    if not math.isfinite(tempo) or not 30 <= tempo <= 240:
+        raise ValueError("Score tempoBpm must be between 30 and 240")
+    if not changes or changes[0]["at"] != 0:
+        raise ValueError("Score chordChanges must begin at zero")
+    for index, change in enumerate(changes):
+        start = float(change["at"])
+        end = float(changes[index + 1]["at"]) if index + 1 < len(changes) else length
+        frequencies = change["frequencies"]
+        if not 0 <= start < end <= length or not frequencies:
+            raise ValueError("Score chordChanges must be ordered and within the timeline")
+        if any(not math.isfinite(float(f)) or not 20 <= float(f) <= 4000 for f in frequencies):
+            raise ValueError("Score frequencies must be between 20 and 4000 Hz")
+        # A boundary chord makes every editorial transition audible; the final
+        # chord rings out on its own to leave room for the closing title.
+        for frequency in frequencies:
+            add_note(samples, start, float(frequency), min(1.95, end - start), 0.055)
+        if index + 1 == len(changes):
+            continue
+        beat_length = 60 / tempo
+        for beat in range(math.ceil((end - start) / beat_length)):
+            at = start + beat * beat_length
+            frequency = float(frequencies[beat % len(frequencies)])
+            add_note(samples, at, frequency * (2 if beat % 2 else 1),
+                     min(1.6, end - at), 0.10 if beat % 4 == 0 else 0.065)
 
 
 def attenuation(time, window):
@@ -110,6 +146,12 @@ def attenuation(time, window):
 
 
 def main():
+    global OUT, PLAN
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--plan", type=Path, default=PLAN)
+    parser.add_argument("--output", type=Path, default=OUT, help="Directory for WAV files and mix evidence")
+    args = parser.parse_args()
+    PLAN, OUT = args.plan.resolve(), args.output.resolve()
     if not shutil.which("ffmpeg") or not shutil.which("ffprobe"):
         raise SystemExit("Install FFmpeg (including ffprobe) before rendering demo audio.")
     OUT.mkdir(parents=True, exist_ok=True)
@@ -124,14 +166,16 @@ def main():
     cues = [
         {
             "at": time - ONSET[name], "syncOffset": ONSET[name], "actionId": name,
-            "file": f"../../tmp/readme-demo/{name}.wav", "gain": 1,
+            "file": relative_asset(f"{name}.wav"), "gain": 1,
             "role": "sfx", "kind": "success",
         }
         for name, time in actions.items()
     ]
     # Keep every other editorial field unchanged; the public plan owns the timeline.
-    if plan["audio"]["cues"] != cues:
+    if (plan["audio"]["cues"] != cues
+            or plan["audio"]["music"]["file"] != relative_asset("music.wav")):
         plan["audio"]["cues"] = cues
+        plan["audio"]["music"]["file"] = relative_asset("music.wav")
         PLAN.write_text(json.dumps(plan, indent=2) + "\n")
     if plan["audio"]["music"]["gain"] != 0.5:
         raise ValueError("This score expects the plan's music gain to be 0.5")
@@ -144,12 +188,15 @@ def main():
         (174.614, 220, 261.626), (146.832, 174.614, 220),
         (116.541, 146.832, 174.614), (130.813, 164.814, 195.998),
     ]
-    for beat in range(math.floor((length - 2) / 0.625)):
-        chord = chords[(beat // 8) % len(chords)]
-        add_note(music, beat * 0.625, chord[beat % 3] * (2 if beat % 2 else 1),
-                 1.6, 0.10 if beat % 4 == 0 else 0.065)
-    for frequency in chords[0]:
-        add_note(music, length - 2, frequency, 1.95, 0.055)
+    if "score" in plan["audio"]:
+        planned_score(music, length, plan["audio"]["score"])
+    else:
+        for beat in range(math.floor((length - 2) / 0.625)):
+            chord = chords[(beat // 8) % len(chords)]
+            add_note(music, beat * 0.625, chord[beat % 3] * (2 if beat % 2 else 1),
+                     1.6, 0.10 if beat % 4 == 0 else 0.065)
+        for frequency in chords[0]:
+            add_note(music, length - 2, frequency, 1.95, 0.055)
     for index in range(count):
         time = index / RATE
         music[index] *= min(1, time / 0.3, (length - time) / 0.8)
@@ -170,7 +217,7 @@ def main():
     ]
     music = load("music.wav")
     ducked = [
-        value * 0.5 * min(attenuation(index / RATE, window) for window in windows)
+        value * 0.5 * min((attenuation(index / RATE, window) for window in windows), default=1)
         for index, value in enumerate(music)
     ]
     sfx = [0.0] * count
@@ -224,7 +271,7 @@ def main():
     report = {
         "planSha256": digest(PLAN),
         "music": {**plan["audio"]["music"], "sha256": digest(OUT / "music.wav")},
-        "cues": [{**cue, "sha256": digest(BASE / cue["file"])} for cue in cues],
+        "cues": [{**cue, "sha256": digest(PLAN.parent / cue["file"])} for cue in cues],
         "master": asset("master.wav"), "sfxStem": asset("sfx-stem.wav"),
         "musicStem": asset("music-ducked.wav"),
         "ducking": {"method": "sample-envelope", "musicGain": 0.5, "windows": windows,
@@ -248,7 +295,8 @@ def main():
     }
     (OUT / "audio-mix.json").write_text(json.dumps(report, indent=2) + "\n")
     print(json.dumps({"durationSeconds": duration, "integratedLufs": float(verified["input_i"]),
-                      "truePeakDbtp": true_peak, "report": "tmp/readme-demo/audio-mix.json"}))
+                      "truePeakDbtp": true_peak,
+                      "report": Path(os.path.relpath(OUT / "audio-mix.json", ROOT)).as_posix()}))
 
 
 if __name__ == "__main__":

@@ -19,6 +19,9 @@ Releases up to 0.4.12 predate this file.
 
 ### Added
 
+- A 15-second social demo with a human-relay opening, cross-person handoff, real inbox component, readable
+  captions and original audio; standalone MP4/GIF and reproducible sources supplement the longer README demo.
+
 - A README animation and standalone demo video, with a reproducible rendering project using the real inbox
   components and fictional data.
 
