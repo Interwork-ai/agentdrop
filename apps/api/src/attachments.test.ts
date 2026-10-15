@@ -15,17 +15,50 @@ const describeDb = TEST_DATABASE_URL ? describe : describe.skip;
 if (!TEST_DATABASE_URL)
   console.warn('[attachments.test] TEST_DATABASE_URL unset: PostgreSQL integration tests SKIPPED');
 
+/** Bound an event wait without leaving its timeout alive after the event arrives. */
+async function within<T>(event: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      event,
+      new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(() => reject(new Error('upload event did not arrive')), ms);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function signal() {
+  let resolve: () => void = () => {};
+  const promise = new Promise<void>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+
 describeDb('attachment upload failure paths', () => {
   let t: TestApp;
   let h: PairedEndpoint;
+  let putEntered = signal();
 
   beforeAll(async () => {
-    t = await createTestApp();
+    t = await createTestApp({
+      wrapStorage: (storage) =>
+        Object.assign(Object.create(storage), {
+          put: (...args: Parameters<typeof storage.put>) => {
+            putEntered.resolve();
+            return storage.put(...args);
+          },
+        }),
+    });
   });
   afterAll(async () => {
     await t.close();
   });
   beforeEach(async () => {
+    putEntered = signal();
     await t.reset();
     h = await pair(t, await signUp(t, 'uploader'), { harness: 'codex' });
   });
@@ -36,17 +69,8 @@ describeDb('attachment upload failure paths', () => {
     // raising an unhandled 'error' when the request has already detached from it — a timing-dependent CI failure.
     source.on('error', () => {});
     source.push(Buffer.alloc(1024, 1));
-    // Disconnect only once the server has staged the attachment: a fixed delay races the handler on a slow
-    // runner, and an abort before staging never reserves anything, so it would test nothing.
-    const disconnect = (async () => {
-      for (let i = 0; i < 250; i++) {
-        if ((await t.db.drizzle.select().from(attachments)).length > 0) break;
-        await new Promise((resolve) => setTimeout(resolve, 20));
-      }
-      source.destroy(new Error('client went away'));
-    })();
-    const res = await Promise.race([
-      t.app.inject({
+    const request = t.app
+      .inject({
         method: 'POST',
         url: '/v1/h/attachments',
         headers: {
@@ -55,12 +79,17 @@ describeDb('attachment upload failure paths', () => {
           'x-agentdrop-filename': 'partial.bin',
         },
         payload: source,
-      }),
-      new Promise<'hung'>((resolve) => setTimeout(() => resolve('hung'), 5000)),
-    ]).catch((err: unknown) => err);
-    expect(res).not.toBe('hung');
-    // Never let the disconnect outlive this test and fire into the next one.
-    await disconnect;
+      })
+      .catch((err: unknown) => err);
+    try {
+      // A committed staging row does not mean the route resumed and attached its stream observer yet.
+      // light-my-request does not retain a native stream's abort error for a late observer; storage entry
+      // proves this is an in-flight upload with the route's observer already installed.
+      await within(putEntered.promise, 5000);
+    } finally {
+      source.destroy(new Error('client went away'));
+      await within(request, 5000);
+    }
     // inject settles as soon as the request stream errors; the handler's cleanup commits just after (on a busy CI
     // runner this has taken over 2 s, so allow 5).
     let rows = await t.db.drizzle.select().from(attachments);
@@ -95,16 +124,19 @@ describeDb('attachment upload abort before storage is ready', () => {
   let h: PairedEndpoint;
   // Holds each storage write until the test says go, reproducing a slow storage backend (mkdir, S3 client setup)
   // that has not attached to the upload stream yet when the client disconnects.
-  let release: () => void = () => {};
+  let storageReady = signal();
+  let putEntered = signal();
+  let sourceClosed = signal();
 
   beforeAll(async () => {
     t = await createTestApp({
       wrapStorage: (storage) =>
         Object.assign(Object.create(storage), {
           put: async (...args: Parameters<typeof storage.put>) => {
-            await new Promise<void>((resolve) => {
-              release = resolve;
-            });
+            // Observe closure without swallowing errors: an unhandled stream error must still fail this test.
+            args[1].once('close', () => sourceClosed.resolve());
+            putEntered.resolve();
+            await storageReady.promise;
             return storage.put(...args);
           },
         }),
@@ -114,6 +146,9 @@ describeDb('attachment upload abort before storage is ready', () => {
     await t.close();
   });
   beforeEach(async () => {
+    putEntered = signal();
+    sourceClosed = signal();
+    storageReady = signal();
     await t.reset();
     h = await pair(t, await signUp(t, 'uploader'), { harness: 'codex' });
   });
@@ -134,14 +169,17 @@ describeDb('attachment upload abort before storage is ready', () => {
         payload: source,
       })
       .catch((err: unknown) => err);
-    for (let i = 0; i < 250 && (await t.db.drizzle.select().from(attachments)).length === 0; i++)
-      await new Promise((resolve) => setTimeout(resolve, 20));
-    // The client goes away while storage has not touched the stream yet; before the fix this raised an uncaught
-    // 'error' on the upload pipe and took the whole API process down.
-    source.destroy(new Error('client went away early'));
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    release();
-    await request;
+    try {
+      // The route observes the request, but storage has not attached its consumer. Wait for both exact
+      // events so no database polling or fixed delay can race the disconnect and the storage release.
+      await within(putEntered.promise, 5000);
+      source.destroy(new Error('client went away early'));
+      await within(sourceClosed.promise, 5000);
+    } finally {
+      source.destroy(new Error('client went away early'));
+      storageReady.resolve();
+      await within(request, 5000);
+    }
     let rows = await t.db.drizzle.select().from(attachments);
     for (let i = 0; i < 100 && rows[0]?.status === 'staging'; i++) {
       await new Promise((resolve) => setTimeout(resolve, 20));

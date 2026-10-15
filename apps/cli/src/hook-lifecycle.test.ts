@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -69,6 +69,34 @@ describe('pendingHooksStatus', () => {
   it('treats a changed command as stale even when both events exist', () => {
     const path = join(dir, 'renamed.json');
     upsertPendingHooks(path, '/old/path/agentdrop pending --profile codex --in-hook');
+    expect(pendingHooksStatus(path, COMMAND)).toBe('stale');
+  });
+
+  it.each([
+    ['legacy timeout', { type: 'command', command: COMMAND, timeout: 600 }],
+    ['missing timeout', { type: 'command', command: COMMAND }],
+    ['checking label', { type: 'command', command: COMMAND, timeout: 10, statusMessage: 'Checking' }],
+    ['wrong handler type', { type: 'prompt', command: COMMAND, timeout: 10 }],
+    ['asynchronous handler', { type: 'command', command: COMMAND, timeout: 10, async: true }],
+  ])('repairs a %s even when the command has not changed', (_name, handler) => {
+    const path = join(dir, 'stale-fields.json');
+    upsertPendingHooks(path, COMMAND);
+    const doc = JSON.parse(readFileSync(path, 'utf8'));
+    doc.hooks.Stop[0].hooks[0] = handler;
+    writeFileSync(path, JSON.stringify(doc));
+    expect(pendingHooksStatus(path, COMMAND)).toBe('stale');
+  });
+
+  it('repairs identical duplicate handlers and a matcher that restricts the session-start notice', () => {
+    const path = join(dir, 'duplicate.json');
+    upsertPendingHooks(path, COMMAND);
+    const doc = JSON.parse(readFileSync(path, 'utf8'));
+    doc.hooks.Stop.push(doc.hooks.Stop[0]);
+    writeFileSync(path, JSON.stringify(doc));
+    expect(pendingHooksStatus(path, COMMAND)).toBe('stale');
+    doc.hooks.Stop.pop();
+    doc.hooks.SessionStart[0].matcher = 'startup';
+    writeFileSync(path, JSON.stringify(doc));
     expect(pendingHooksStatus(path, COMMAND)).toBe('stale');
   });
 
@@ -189,6 +217,50 @@ const stopOnly = (command: string) => ({
 });
 
 describe('synchronizeInstalledHooks repairs per file', () => {
+  it.each(['codex', 'claude-code'] as const)(
+    '%s repairs handler drift while keeping the chosen profile, executable, other hooks and removed events',
+    (key) => {
+      profile('work', key);
+      profile('home', key);
+      const exe = executable();
+      const command = hookCommand(exe, 'work');
+      const path = join(dir, 'host.json');
+      upsertPendingHooks(path, command);
+      recordHookEvents(path, ['Stop', 'UserPromptSubmit', 'SessionStart']);
+      const doc = JSON.parse(readFileSync(path, 'utf8'));
+      delete doc.hooks.UserPromptSubmit;
+      const unrelated = { type: 'command', command: '/opt/other-tool notify', timeout: 45 };
+      doc.hooks.Stop[0].hooks[0].statusMessage = 'Checking';
+      doc.hooks.Stop[0].hooks[0].timeout = 600;
+      doc.hooks.Stop[0].hooks.push({ ...doc.hooks.Stop[0].hooks[0] }, unrelated);
+      doc.hooks.Stop[0].matcher = 'keep-for-the-other-tool';
+      doc.model = 'example';
+      writeFileSync(path, JSON.stringify(doc));
+
+      expect(synchronizeInstalledHooks({ [key]: path }).repaired).toEqual([
+        { profile: 'work', harness: key, path },
+      ]);
+      const repaired = JSON.parse(readFileSync(path, 'utf8'));
+      expect(repaired.hooks.Stop).toEqual([
+        { matcher: 'keep-for-the-other-tool', hooks: [unrelated] },
+        { hooks: [{ type: 'command', command, timeout: 10 }] },
+      ]);
+      expect(repaired.model).toBe('example');
+      expect(repaired.hooks.UserPromptSubmit).toBeUndefined();
+      expect(commandsIn(path, 'SessionStart')).toEqual([`${command} --hook-output session-start`]);
+
+      // A canonical file is not rewritten on later commands, including when its JSON key order differs.
+      const handler = repaired.hooks.Stop[1].hooks[0];
+      repaired.hooks.Stop[1].hooks[0] = { timeout: handler.timeout, command, type: handler.type };
+      writeFileSync(path, JSON.stringify(repaired));
+      utimesSync(path, new Date(0), new Date(0));
+      const before = readFileSync(path, 'utf8');
+      expect(synchronizeInstalledHooks({ [key]: path }).repaired).toEqual([]);
+      expect(readFileSync(path, 'utf8')).toBe(before);
+      expect(statSync(path).mtimeMs).toBe(0);
+    },
+  );
+
   it('keeps the installed profile when two profiles share one harness, so repeated runs change nothing', () => {
     profile('work');
     profile('home');

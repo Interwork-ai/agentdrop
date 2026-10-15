@@ -4,6 +4,7 @@ import { join, resolve } from 'node:path';
 import type { ApiClient } from '@agentdrop/client';
 import { type DropSummary, LIMITS } from '@agentdrop/contracts';
 import { readEffectiveHookSettings } from '../client-preferences.js';
+import { dropNoticeSource } from '../drop-notice-source.js';
 import { type Language, readLanguage } from '../locale.js';
 import type { Output } from '../output.js';
 import { configDir, stateDir } from '../paths.js';
@@ -228,17 +229,16 @@ async function fetchBand(profileName: string, now: number): Promise<BandData> {
   const drops: BandDrop[] = [];
   const groups = new Map<string, BandGroup>();
   for (const d of inbox.drops) {
-    const sources: string[] = d.sources ?? [];
-    const label = d.group_labels?.[0];
+    const { group: label } = dropNoticeSource(d);
     const mentioned = d.mentioned_me === true;
     const at = d.received_at ?? d.created_at;
     // a muted group stays quiet unless the drop calls on the person (ADR 0015)
     if (d.muted === true && !mentioned) continue;
-    const direct = sources.includes('direct') || !label;
     const mine = replyToMine(d);
     // a reply to someone else's drop is like any other drop; an older server cannot say, so it keeps its row
     const replyTitle = d.reply_to?.title && mine !== false ? clean(d.reply_to.title, TITLE_MAX) : null;
-    if (direct || mentioned || replyTitle) {
+    // Without a group address, keep an individual row that can still be opened by drop id.
+    if (!label?.group_id || mentioned || replyTitle) {
       drops.push({
         drop_id: d.drop_id,
         title: clean(d.title, TITLE_MAX),

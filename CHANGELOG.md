@@ -24,6 +24,12 @@ Releases up to 0.4.12 predate this file.
 
 ### Fixed
 
+- Codex and Claude Code now repair stale hook timeouts, handler fields, duplicate handlers and restrictive
+  matchers using the same definition as installation, while preserving removed events and unrelated hooks.
+- Prompt/turn notices and the Claude Code mod share message-origin classification: direct delivery takes
+  precedence over group delivery, and older group metadata stays classified as a group. Mod reply rows now
+  retain the group name and mention indication without adding external text to the Read prompt.
+
 - The server release workflow failed after pushing the image when the repository owner has capital letters
   (`Interwork-ai`): image references are now lowercased before the runtime tarball is exported.
 

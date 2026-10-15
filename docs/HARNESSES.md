@@ -5,6 +5,32 @@ named entries, never another person’s agents, harnesses, automatic addresses o
 retain details of the viewer’s own agents only; the shared MCP renderer and companion skill apply this policy
 across Codex CLI, Claude Code, opencode and Cursor. No tools or harness registration paths are added for it.
 
+## Codex and Claude Code: shared behaviour, different surfaces
+
+Both adapters start the same MCP bridge and install the same companion skill. Their message rules are shared;
+the configuration format and the host's presentation APIs account for the differences below.
+
+| Area | Codex | Claude Code | Shared implementation |
+|---|---|---|---|
+| Sending, reading and attachments | MCP stdio bridge | Same bridge | `packages/mcp`, CLI `mcp`; the same configured toolset and server authorization |
+| Session, prompt and end-of-turn notices | `systemMessage` through three command hooks | The same three hooks, alongside the mod or status line | `commands/pending.ts`, `hook-notifications.ts`; one seen record per person |
+| Model context | Full list at the first prompt and on changes; otherwise a short unchanged line | Same | `model-context.ts`, ADR 0031; metadata is untrusted and never an instruction to act |
+| Glance and actions | This adapter installs no persistent message band or custom status line | Mod: live band, Read / On it / Later, pane; older versions: status line | The band uses the same message-origin classification; presentation and interaction remain host-specific |
+| Catching up | Ask the agent, optionally invoking `$agentdrop` | Ask the agent, or use the mod's `/agentdrop-read` command | Companion skill procedure; only messages shown in detail are marked read |
+| MCP registration | `codex mcp add/remove`, with a TOML file fallback | `claude mcp add/remove --scope user`, with a JSON file fallback | Adapter orchestration and bridge arguments; file formats stay in each adapter |
+| Hook maintenance | Codex hook file and first-run trust | Claude Code settings file | The same canonical handler, drift check and repair plan; preserve the installed executable/profile and removed events |
+| Unattended runs | Recognize `codex exec` in the process ancestry | Read the host's attended/SDK environment signals | `hook-attendance.ts`; unattended hooks do not show or claim a person's notice |
+
+The mod polls every 20 seconds with a shared 15-second cache; ordinary hook notices run at host events. These are
+different delivery moments, not an instantaneous push guarantee. The mod's host APIs and interactive band are not
+installed by the Codex adapter.
+
+`drop-notice-source.ts` is the single source of direct-versus-group classification for prompt context, ordinary
+notices and the live band. Direct delivery takes precedence when a drop also reached the person through a group.
+An older server's explicit group source stays classified as a group even when the label is missing; it never
+creates a guessed group address. Group replies in the mod retain their group label and mention indication, while
+the Read prompt carries only the validated handle and drop id, never the external group name or title.
+
 ## User-prompt context (Codex / Claude Code / omp)
 
 Connect now installs both the existing human-facing `Stop` notice and a `UserPromptSubmit` hook. The latter runs
@@ -59,7 +85,10 @@ only `structuredContent` does not get the line. Same bridge, same behaviour for 
 
 A packaged CLI checks the installed hook files (Codex `hooks.json`, Claude Code `settings.json`, Cursor
 `hooks.json`) on every command except `mcp` and `--in-hook`, and rewrites only AgentDrop's own entries when they
-differ from what this version writes. Repair is per file: the executable and `--profile` are recovered from the
+differ from what this version writes. For Codex and Claude Code this includes duplicate handlers, a wrong type or
+timeout, legacy status text or asynchronous flags, and a matcher that limits when the hook runs. Installation and
+repair share the canonical handler; a current file is not rewritten, even if its JSON keys use a different order.
+Repair is per file: the executable and `--profile` are recovered from the
 installed command, so a `connect --executable` choice (and with it Codex's hook trust hash) is kept while that file
 exists, and a file owned by one profile is never switched to another. A hook whose profile no longer exists is
 left for `connect`. A file that exists but cannot be read or parsed is left alone too, and `doctor` names it
