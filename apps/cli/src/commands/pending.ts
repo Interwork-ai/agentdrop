@@ -6,6 +6,7 @@ import { AgentDropError, LIMITS, mergeNoticeState } from '@agentdrop/contracts';
 import { recordHookSession } from '../autorun.js';
 import { readEffectiveHookSettings, synchronizeClientSettings } from '../client-preferences.js';
 import { loadCredential } from '../credentials.js';
+import { dropNoticeSource } from '../drop-notice-source.js';
 import { unattendedHookRun } from '../hook-attendance.js';
 import { announceSeen, notificationForHook, RETRY_MS, type ShownState } from '../hook-notifications.js';
 import { type Language, readLanguage } from '../locale.js';
@@ -124,8 +125,7 @@ export async function fetchPending(
       unread: inbox.unread_count,
       unread_drops: inbox.drops.map((drop) => {
         // Read defensively: a notice must never fail because a server left a field out.
-        const sources: string[] = drop.sources ?? [];
-        const label = drop.group_labels?.[0];
+        const { direct, group } = dropNoticeSource(drop);
         return {
           drop_id: drop.drop_id,
           mentioned_me: drop.mentioned_me === true,
@@ -134,14 +134,8 @@ export async function fetchPending(
           title: drop.title,
           author: { handle: drop.author.handle, display_label: drop.author.display_label },
           attachment_count: drop.attachment_count,
-          direct: sources.includes('direct'),
-          group: sources.includes('direct')
-            ? null
-            : label
-              ? { name: label.display_name, slug: label.slug }
-              : sources.includes('group')
-                ? { name: '', slug: '' }
-                : null,
+          direct,
+          group: group ? { name: group.display_name, slug: group.slug } : null,
         };
       }),
       contact_requests: req.contact_requests_received.map((p) => ({

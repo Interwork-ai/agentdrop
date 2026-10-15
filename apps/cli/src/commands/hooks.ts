@@ -163,12 +163,17 @@ export interface InstalledHooks {
   profile: string | null;
 }
 
-function ourCommands(doc: Record<string, unknown>, event: string): string[] {
+function ourHooks(doc: Record<string, unknown>, event: string): Array<{ group: HookGroup; hook: HookEntry }> {
   const hooks = (doc.hooks as Record<string, HookGroup[]> | undefined) ?? {};
-  return (Array.isArray(hooks[event]) ? hooks[event] : [])
-    .flatMap((group) => (Array.isArray(group?.hooks) ? group.hooks : []))
-    .map((hook) => hook?.command)
-    .filter(isAgentDropHookCommand);
+  return (Array.isArray(hooks[event]) ? hooks[event] : []).flatMap((group) =>
+    (Array.isArray(group?.hooks) ? group.hooks : [])
+      .filter((hook) => isAgentDropHookCommand(hook?.command))
+      .map((hook) => ({ group, hook })),
+  );
+}
+
+function ourCommands(doc: Record<string, unknown>, event: string): string[] {
+  return ourHooks(doc, event).map(({ hook }) => hook.command);
 }
 
 function readJsonQuietly(path: string): Record<string, unknown> | null {
@@ -205,7 +210,7 @@ export function installedPendingHooks(path: string): InstalledHooks | null {
  * `recorded` is every event AgentDrop has ever written into this file (see hook-record.ts). A missing event is
  * added only when it is not in that set; one that was written and is now gone was removed by a person, and stays
  * removed. Without a record, the events present now stand in for it. An event that is present but differs from
- * what this version writes (command, flags) is always repaired in place.
+ * what this version writes (command, handler fields or matcher) is always repaired in place.
  */
 export function pendingHooksPlan(
   path: string,
@@ -218,9 +223,17 @@ export function pendingHooksPlan(
   const known = new Set([...(recorded ?? []), ...installed.events]);
   const events = PENDING_HOOK_EVENTS.filter((event) => installed.events.includes(event) || !known.has(event));
   const stale = events.some((event) => {
-    const ours = ourCommands(doc, event);
-    const want = expectedCommand(command, event);
-    return ours.length === 0 || ours.some((c) => c !== want);
+    const ours = ourHooks(doc, event);
+    if (ours.length !== 1) return true;
+    const want = pendingHook(command, event);
+    return ours.some(
+      ({ group, hook }) =>
+        group.matcher !== undefined ||
+        Object.keys(hook).length !== Object.keys(want).length ||
+        hook.type !== want.type ||
+        hook.command !== want.command ||
+        hook.timeout !== want.timeout,
+    );
   });
   return { status: stale ? 'stale' : 'current', events: [...events] };
 }
@@ -250,6 +263,11 @@ function expectedCommand(command: string, event: string): string {
   return target ? `${command} --hook-output ${target}` : command;
 }
 
+/** One canonical handler for installation and repair; key order never affects drift detection. */
+function pendingHook(command: string, event: string): HookEntry {
+  return { type: 'command', command: expectedCommand(command, event), timeout: 10 };
+}
+
 /** Adds our completion notice and next-prompt context without dropping user hooks. */
 export function upsertPendingHooks(
   path: string,
@@ -273,15 +291,7 @@ function upsertHooks(
   const hooks = ((doc.hooks as Record<string, HookGroup[]> | undefined) ?? {}) as Record<string, HookGroup[]>;
   for (const event of events) {
     hooks[event] = withoutPendingHooks(hooks[event] ?? []);
-    hooks[event].push({
-      hooks: [
-        {
-          type: 'command',
-          command: expectedCommand(command, event),
-          timeout: 10,
-        },
-      ],
-    });
+    hooks[event].push({ hooks: [pendingHook(command, event)] });
   }
   doc.hooks = hooks;
   writeFileAtomic(path, `${JSON.stringify(doc, null, 2)}\n`);

@@ -13,6 +13,7 @@ import {
   truncate,
 } from './commands/band.js';
 import { readCommand } from './commands/mail.js';
+import { fetchPending } from './commands/pending.js';
 import type { Output } from './output.js';
 
 /*
@@ -250,6 +251,48 @@ function capture(): { out: Output; results: unknown[] } {
 }
 
 describe('the band commands', () => {
+  it('uses the same direct-delivery precedence as prompt and Stop notices', async () => {
+    pages = [
+      [
+        drop(10, 'Delivered both ways', {
+          sources: ['direct', 'group'],
+          group_labels: [lab],
+          mentioned_me: true,
+        }),
+      ],
+    ];
+    unreadCount = 1;
+    const pending = await fetchPending('cc');
+    const band = await bandData('cc', { fresh: true });
+    expect(pending?.unread_drops[0]).toMatchObject({ direct: true, group: null });
+    expect(band.drops[0]).toMatchObject({ drop_id: id(10), group: null });
+    expect(band.groups).toEqual([]);
+  });
+
+  it('keeps known group origins when older servers omit labels, without inventing an address', async () => {
+    pages = [
+      [
+        drop(10, 'Group without label', { sources: ['group'] }),
+        drop(11, 'Old metadata', { sources: undefined }),
+        drop(12, 'Label without sources', { sources: undefined, group_labels: [lab], mentioned_me: true }),
+      ],
+    ];
+    unreadCount = 3;
+    const pending = await fetchPending('cc');
+    const band = await bandData('cc', { fresh: true });
+    expect(pending?.unread_drops.map((d) => d.group)).toEqual([
+      { name: '', slug: '' },
+      null,
+      { name: 'Lab', slug: 'lab' },
+    ]);
+    expect(band.drops.map((d) => d.group)).toEqual([
+      { group_id: '', name: '', slug: '' },
+      null,
+      { group_id: LAB, name: 'Lab', slug: 'lab' },
+    ]);
+    expect(band.groups).toEqual([]);
+  });
+
   it('lists drops to answer one by one, the rest by group, muted groups only when called on', async () => {
     const data = await bandData('cc', { fresh: true });
     expect(data.drops.map((d) => d.title)).toEqual(['Direct question', 'Calls on you']);

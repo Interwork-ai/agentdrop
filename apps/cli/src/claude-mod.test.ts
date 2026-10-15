@@ -817,6 +817,50 @@ describe("the mod's rows", async () => {
     expect(rows.buildRows(theirs, new Set()).rows[0]?.text).toBe('Wang · "Re: Ablation, run 14"');
   });
 
+  it.each(['en', 'zh'] as const)(
+    'keeps the group on reply rows without putting its name in the read prompt (%s)',
+    (language) => {
+      const original = data(language);
+      const first = original.drops[0] as (typeof original.drops)[number];
+      const group = { group_id: G1, slug: 'lab', name: 'Lab' };
+      const reply = { ...first, group };
+      const render = (drop: unknown) =>
+        rows.buildRows({ ...original, drops: [drop], groups: [] }, new Set()).rows[0];
+      const directPrompt = render(first)?.prompt;
+      const named = language === 'en' ? '“Lab” #lab' : '「Lab」#lab';
+      for (const mine of [true, null]) {
+        for (const title of ['Re: Ablation, run 14', 'Split C checked']) {
+          const row = render({ ...reply, reply_to_mine: mine, title });
+          expect(row?.text).toContain(named);
+          expect(row?.text).toContain('Wang');
+          expect(row?.text).toContain('Ablation, run 14');
+          expect(row?.prompt).toBe(directPrompt);
+        }
+      }
+      const mentioned = render({ ...reply, mentioned: true });
+      expect(mentioned?.text).toContain(named);
+      expect(mentioned?.text).toContain(language === 'en' ? 'mentioned you' : '@了你');
+    },
+  );
+
+  it.each(['en', 'zh'] as const)(
+    'keeps an unnamed group classified as a group, including older metadata (%s)',
+    (language) => {
+      const original = data(language);
+      const first = original.drops[0] as (typeof original.drops)[number];
+      const unknown = { ...first, group: { group_id: '', slug: '', name: '' } };
+      for (const reply of [true, false]) {
+        const built = rows.buildRows(
+          { ...original, drops: [{ ...unknown, reply_to_mine: reply }], groups: [] },
+          new Set(),
+        );
+        expect(built.rows[0]?.text).toContain(language === 'en' ? 'Group message' : '群消息');
+        expect(built.rows[0]?.text).not.toContain(G1);
+        expect(built.rows[0]?.prompt).toBe(rows.buildRows(original, new Set()).rows[0]?.prompt);
+      }
+    },
+  );
+
   it('"Later" hides a row; a group comes back when a newer message arrives', () => {
     const first = rows.buildRows(data('en'), new Set());
     const hidden = new Set(first.rows.map((r) => rows.rowKey(r)));

@@ -5,6 +5,8 @@
 const T = {
   en: {
     title: 'AgentDrop',
+    unnamedGroup: 'Group message',
+    alsoMentioned: ' · mentioned you',
     direct: (from, title) => `${from} · "${title}"`,
     mention: (from, group, title) => `${from} mentioned you in ${group} · "${title}"`,
     replyMine: (from, original, title) => `${from} replied to your "${original}" · "${title}"`,
@@ -52,6 +54,8 @@ const T = {
   },
   zh: {
     title: 'AgentDrop',
+    unnamedGroup: '群消息',
+    alsoMentioned: ' · @了你',
     direct: (from, title) => `${from} ·「${title}」`,
     mention: (from, group, title) => `${from} 在 ${group} @了你 ·「${title}」`,
     replyMine: (from, original, title) => `${from} 回复了你的「${original}」·「${title}」`,
@@ -331,14 +335,15 @@ export function buildRows(data, dismissed, surface = 'band', since = undefined) 
     const title = clean(d.title, { max: 80 });
     const slug = d.group && SLUG.test(d.group.slug ?? '') ? d.group.slug : null;
     // shown, never submitted: the group is named for the person
-    const group = slug ? t.groupLabel(clean(d.group.name, { max: 40 }), slug) : '';
+    const groupName = clean(d.group?.name, { max: 40 });
+    const group = d.group ? (slug ? t.groupLabel(groupName, slug) : groupName || t.unnamedGroup) : '';
     const original = clean(d.reply_to_title, { max: 80 });
     // `reply_to_mine` true: it answers the person's own drop; null: an older server could not say whose
     const mine = d.reply_to_mine === true;
     const reply = original && d.reply_to_mine !== false;
     // a reply titled "Re: <original>" says nothing more than "replied to <original>"
     const redundant = reply && /^re:\s*/i.test(title) && title.replace(/^re:\s*/i, '') === original;
-    const text =
+    const description =
       (reply
         ? redundant
           ? (mine ? t.replyMineOnly : t.replyOnly)(from, original)
@@ -346,6 +351,11 @@ export function buildRows(data, dismissed, surface = 'band', since = undefined) 
         : d.mentioned && group
           ? t.mention(from, group, title)
           : t.direct(from, title)) + (d.attachments > 0 ? t.files(d.attachments) : '');
+    // Replies and older metadata still name their group, as every other notice surface does. A mention's
+    // normal sentence already contains the group. These labels stay display-only, never in the Read prompt.
+    const text =
+      (group && (reply || !d.mentioned) ? `${group} · ${description}` : description) +
+      (reply && d.mentioned ? t.alsoMentioned : '');
     rows.push({
       kind: 'drop',
       id: d.drop_id,
