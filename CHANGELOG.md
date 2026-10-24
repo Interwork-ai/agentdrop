@@ -15,6 +15,10 @@ Releases up to 0.4.12 predate this file.
 - The CLI update reminder's Chinese text says to restart the client, like the English text, instead of naming
   four clients.
 
+- The dashboard updates by itself within about a second when something changes (a new drop, a read elsewhere, a
+  contact request or group change), through the event stream of the visible tab; its 10-second background refresh
+  stays as it was.
+
 - Database: an index on `mailbox_events.created_at` (expand-only migration 0035). It is a plain `CREATE INDEX` on
   `mailbox_events`, which has never been swept before: it blocks sends and state changes while it builds, so plan a
   migration window on a server with a long history.
@@ -70,6 +74,10 @@ Releases up to 0.4.12 predate this file.
   components and fictional data.
 
 ### Fixed
+
+- Dashboard: a group left or declined earlier opens again when it is opened again (after a new invitation, or with
+  Back) instead of showing an empty page, and a leave or decline whose answer arrives after another group was
+  opened no longer sends you out of that other group.
 
 - Codex and Claude Code now repair stale hook timeouts, handler fields, duplicate handlers and restrictive
   matchers using the same definition as installation, while preserving removed events and unrelated hooks.

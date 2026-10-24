@@ -1,8 +1,8 @@
 /**
  * The mailbox journeys a person clicks through every day: search and the Unread filter, "Mark as unread", archiving
  * and unarchiving, forwarding to another contact, reading a long body part by part, sending and downloading an
- * attachment (which must never download or render on its own), and one's own group post kept out of the inbox
- * (ADR 0033).
+ * attachment (which must never download or render on its own), one's own group post kept out of the inbox
+ * (ADR 0033), and a drop that appears in an open inbox by itself through the event stream (ADR 0040).
  */
 import { readFile } from 'node:fs/promises';
 import { connect, group, sendDrop, signUp, toGroup, toPerson } from '../api.mjs';
@@ -15,6 +15,7 @@ const ARCHIVE_ME = 'MB archive me';
 const LONG = 'MB long read';
 const ATTACHED = 'MB notes with a file';
 const OWN_POST = 'MB my own group post';
+const LIVE = 'MB arrived while open';
 const TEXT_FILE = { name: 'mb-notes.txt', mimeType: 'text/plain', buffer: Buffer.from('hello attachment\n') };
 const HTML_FILE = {
   name: 'mb-page.html',
@@ -46,7 +47,7 @@ export async function run(ctx) {
   await sendDrop(alice, [toGroup(notes)], OWN_POST, 'Posted to my own group.');
 
   await asAlice(ctx);
-  await asCarol(ctx, carol);
+  await asCarol(ctx, carol, alice);
   await asBob(ctx, bob);
 
   async function asAlice(ctx) {
@@ -233,14 +234,55 @@ async function pickWithKeyboard(page, text, match) {
     throw new Error('focus left the recipient field after the pick');
 }
 
-async function asCarol(ctx, carol) {
-  const { page, context, step, see } = await ctx.session('carol', carol);
+async function asCarol(ctx, carol, alice) {
+  const { page, context, step, see, nav } = await ctx.session('carol', carol);
+  const list = page.getByRole('region', { name: 'Message list' });
+  // Every frame of the page's event stream, as the browser received it (EventSource hides them from the page).
+  const frames = [];
+  const cdp = await context.newCDPSession(page);
+  cdp.on('Network.eventSourceMessageReceived', (m) => {
+    if (m.eventName === 'events') frames.push(m.data);
+  });
+  await cdp.send('Network.enable');
+  // Mailbox list requests still running.
+  const listing = new Set();
+  page.on('request', (r) => {
+    if (r.url().includes('/drops?')) listing.add(r);
+  });
+  for (const done of ['requestfinished', 'requestfailed']) page.on(done, (r) => listing.delete(r));
+  const until = async (check, what, ms = 10_000) => {
+    for (const end = Date.now() + ms; !check(); await page.waitForTimeout(50))
+      if (Date.now() > end) throw new Error(`timed out waiting for ${what}`);
+  };
+
   await step('the forwarded drop arrives', async () => {
-    await page
-      .getByRole('region', { name: 'Message list' })
-      .getByText(`Fwd: ${QUARTERLY}`, { exact: true })
-      .click();
+    await list.getByText(`Fwd: ${QUARTERLY}`, { exact: true }).click();
     await see('The zebra numbers are in the second table.');
+  });
+  await step('a drop sent now appears in the open inbox by itself (event stream, ADR 0040)', async () => {
+    // Settle first. Opening the drop marked it read: that answer and the stream event it causes both refetch the
+    // list, and a send racing them could appear through those refetches without the stream announcing it.
+    const opened = new URL(page.url()).pathname.split('/').pop();
+    await page.getByRole('button', { name: 'Mark as unread' }).waitFor();
+    await until(
+      () => frames.some((data) => data.includes('"delivery.state"') && data.includes(opened)),
+      'the stream to announce the read',
+    );
+    await nav('Inbox');
+    await page.waitForURL(/\/app\/inbox$/);
+    await see('Select a message');
+    // no list request for 600 ms: the read's own refetches are done
+    let quietSince = Date.now();
+    await until(() => {
+      if (listing.size) quietSince = Date.now();
+      return Date.now() - quietSince >= 600;
+    }, 'the inbox to stop refetching');
+
+    const sent = await sendDrop(alice, [toPerson(carol)], LIVE, 'Arrived while the inbox was open.');
+    // The inbox also polls every 10 s; only the stream brings the drop in well under that.
+    await list.getByText(LIVE, { exact: true }).waitFor({ timeout: 5_000 });
+    if (!frames.some((data) => data.includes('"delivery.created"') && data.includes(sent.drop_id)))
+      throw new Error('no event stream frame announced the new drop');
   });
   await context.close();
 }

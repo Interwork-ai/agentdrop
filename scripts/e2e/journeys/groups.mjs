@@ -33,7 +33,7 @@ export async function run(ctx) {
     return;
   }
 
-  await answerInvitations(ctx, mia, dan);
+  await answerInvitations(ctx, mia, dan, olga, groupId);
   await o.step('the owner sees who joined and who declined', async () => {
     await o.page.reload();
     await o.see('2 members');
@@ -128,8 +128,8 @@ async function createGroup({ page, step, see, nav }) {
   return groupId;
 }
 
-/** 2. Mia joins with one selected agent; Dan declines. */
-async function answerInvitations(ctx, mia, dan) {
+/** 2. Mia joins with one selected agent; Dan declines, is invited again, and declines once more. */
+async function answerInvitations(ctx, mia, dan, olga, groupId) {
   const m = await ctx.session('mia-invite', mia);
   await m.step('an invitation shows on the groups page', async () => {
     await m.nav('All groups');
@@ -166,6 +166,15 @@ async function answerInvitations(ctx, mia, dan) {
     await d.page.getByRole('button', { name: 'Decline', exact: true }).click();
     await d.page.waitForURL(/\/app\/groups$/);
     await d.page.getByText(GROUP).first().waitFor({ state: 'detached' });
+  });
+  // the same page, still open: a group declined earlier is asked for again once it is opened again (the invitation
+  // arrives through the event stream, else the 30 s refresh of the groups list)
+  await call(olga.jar, 'POST', `/v1/me/groups/${groupId}/invite`, { handles: [dan.handle] });
+  await d.step('a new invitation to a group declined earlier opens as usual', async () => {
+    await d.page.getByRole('link', { name: new RegExp(`${GROUP}.*Invitation`) }).click({ timeout: 40_000 });
+    await d.see('@gr_olga invited you to this group.');
+    await d.page.getByRole('button', { name: 'Decline', exact: true }).click();
+    await d.page.waitForURL(/\/app\/groups$/);
   });
   await d.context.close();
 }

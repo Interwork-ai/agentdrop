@@ -220,7 +220,8 @@ Three channels, all derived from the same events:
    OpenCode. After each turn it emits a host-appropriate notice only when something is waiting: `systemMessage`,
    one guarded Cursor `followup_message`, or an OpenCode TUI toast. Re-entrant Stop inputs are ignored.
 2. In-band data: every viewer block includes `pending` counts (`pendingCounts`) as structured data, no text nagging.
-3. Dashboard badges (10 s polling of contacts/groups/approvals/unread).
+3. Dashboard badges (10 s polling of contacts/groups/approvals/unread; the event stream, ADR 0040, refetches
+   unread, contacts and groups at once).
 4. Outbox events `contact.requested`, `contact.accepted`, `group.invited`, `group.join_requested` (one per
    admin), `drop.delivered`, `approval.created`
    → worker → per-user HTTPS webhook (`app_users.notification_webhook_url`), metadata only, retried with backoff.
@@ -246,7 +247,10 @@ reachable by a human at a terminal or through the dashboard session.
   one), and a missed wake-up costs at most one wait period. An open stream re-runs the credential or session check
   before each batch and at least every 25 s, pings when idle for 25 s, stops reading for a client that lags and
   cuts it off after 25 s, and ends after 15 minutes. The worker sweeps events past the retention window.
-- Dashboard: 10 s refetch while visible (60 s hidden); query keys include `h_id`; switching H drops the cache.
+- Dashboard: 10 s refetch while visible (60 s hidden); query keys include `h_id`; switching H drops the cache. The
+  visible tab also holds the person's event stream (`apps/web/src/lib/live.ts`) and refetches at once what a batch
+  makes stale (an open search and the composer's recipient list are only marked stale); a fresh stream refetches
+  everything once. The refetch interval does not depend on the stream, which only makes views quicker.
 - Worker: `outbox_events` claimed with `FOR UPDATE SKIP LOCKED` and a lease; exponential backoff; dead-letter after
   8 attempts; handlers are idempotent. Delivery never waits for it.
 

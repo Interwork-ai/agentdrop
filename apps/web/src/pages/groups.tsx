@@ -558,12 +558,25 @@ function GroupDetailPane() {
   const interval = useFocusAwareInterval();
   const id = params.groupId ?? null;
   const [history, setHistory] = useState(false);
-  // Opening another group starts over: the admin view belongs to the group it was turned on in.
+  // A group I just left or declined is no longer visible to me: stop asking for it before the answer can come back
+  // 404 (a mounted query refetches as soon as its cache is dropped, and the timeline polls).
+  const [goneGroup, setGoneGroup] = useState<string | null>(null);
+  // Opening another group starts over: the admin view belongs to the group it was turned on in, and a group left
+  // or declined earlier is asked for again when it is opened again (after a new invitation, or with Back).
   const [shownGroup, setShownGroup] = useState(id);
   if (shownGroup !== id) {
     setShownGroup(id);
     setHistory(false);
+    setGoneGroup(null);
   }
+  // The group shown right now (none once the pane is gone), for answers that arrive after the person moved on.
+  const showing = useRef(id);
+  useEffect(() => {
+    showing.current = id;
+    return () => {
+      showing.current = null;
+    };
+  }, [id]);
   const rawTab = search.get('tab');
   const tab: GroupTab =
     rawTab === 'members' || rawTab === 'files' || rawTab === 'settings' ? rawTab : 'messages';
@@ -573,9 +586,6 @@ function GroupDetailPane() {
     else params.set('tab', next);
     setSearch(params, { replace: true });
   };
-  // A group I just left or declined is no longer visible to me: stop asking for it before the answer can come back
-  // 404 (a mounted query refetches as soon as its cache is dropped, and the timeline polls).
-  const [goneGroup, setGoneGroup] = useState<string | null>(null);
   const gone = !!id && goneGroup === id;
   const group = useQuery({
     queryKey: ['group', id, currentH?.h_id],
@@ -622,18 +632,30 @@ function GroupDetailPane() {
     mutationFn: (fn: () => Promise<unknown>) => fn(),
     onSuccess: refresh,
   });
-  /** After leaving or declining: disable and cancel this group's queries, then go back to the list. */
-  const forgetGroup = () => {
-    if (!id) return;
-    setGoneGroup(id);
-    void qc.cancelQueries({ queryKey: ['group', id] });
-    nav('/app/groups');
-    qc.removeQueries({ queryKey: ['group', id] });
+  /*
+   * Leaving and declining name the group they were sent for: the answer may arrive after the person opened another
+   * group or page, and a pending mutation's callbacks see whichever render updated them last. As one is sent, this
+   * tab stops asking for the group at once: the change can reach it through the event stream (ADR 0040) before the
+   * answer does, and a refetch then would come back 404. Undone if it fails.
+   */
+  const stopAsking = (groupId: string) => {
+    setGoneGroup(groupId);
+    void qc.cancelQueries({ queryKey: ['group', groupId] });
+  };
+  /** The leave or decline failed: the group is still mine to see, if it is still the one shown. */
+  const keepAsking = (groupId: string) => setGoneGroup((gone) => (gone === groupId ? null : gone));
+  /** After leaving or declining: drop this group's queries, and go back to the list if it is still shown. */
+  const forgetGroup = (groupId: string) => {
+    stopAsking(groupId);
+    if (showing.current === groupId) nav('/app/groups');
+    qc.removeQueries({ queryKey: ['group', groupId] });
     qc.invalidateQueries({ queryKey: ['groups'] });
   };
   const leave = useMutation({
-    mutationFn: () => api.post(`/v1/me/groups/${id}/leave`),
-    onSuccess: forgetGroup,
+    mutationFn: (groupId: string) => api.post(`/v1/me/groups/${groupId}/leave`),
+    onMutate: stopAsking,
+    onError: (_err, groupId) => keepAsking(groupId),
+    onSuccess: (_data, groupId) => forgetGroup(groupId),
   });
   if (!id)
     return (
@@ -666,7 +688,14 @@ function GroupDetailPane() {
       <div className="mx-auto w-full max-w-3xl space-y-5 p-4 md:p-6">
         <GroupHeader group={g} />
         {mine?.status === 'invited' ? (
-          <InviteAccept group={g} endpoints={endpoints} onDone={refresh} onGone={forgetGroup} />
+          <InviteAccept
+            group={g}
+            endpoints={endpoints}
+            onDone={refresh}
+            onLeaving={stopAsking}
+            onStay={keepAsking}
+            onGone={forgetGroup}
+          />
         ) : null}
       </div>,
     );
@@ -1003,7 +1032,7 @@ function GroupDetailPane() {
                         ),
                       )
                     )
-                      leave.mutate();
+                      leave.mutate(g.group_id);
                   }}
                 >
                   {t('Leave group', '退出群组')}
@@ -1726,13 +1755,19 @@ function InviteAccept({
   group,
   endpoints,
   onDone,
+  onLeaving,
+  onStay,
   onGone,
 }: {
   group: GroupDetail;
   endpoints: Array<{ h_id: string; label: string; device: { label: string }; is_default_receiver: boolean }>;
   onDone: () => void;
+  /** As the decline is sent: stop asking for the group (the change may arrive before the answer). */
+  onLeaving: (groupId: string) => void;
+  /** The decline failed: the group is still mine to see. */
+  onStay: (groupId: string) => void;
   /** After declining: the group is no longer visible to me. */
-  onGone: () => void;
+  onGone: (groupId: string) => void;
 }) {
   const t = useT();
   const [receiveAll, setReceiveAll] = useState(true);
@@ -1748,9 +1783,11 @@ function InviteAccept({
     onSuccess: onDone,
   });
   const decline = useMutation({
-    mutationFn: () => api.post(`/v1/me/groups/${group.group_id}/decline`),
+    mutationFn: (groupId: string) => api.post(`/v1/me/groups/${groupId}/decline`),
     // Once declined the group is no longer visible to me, so refetching it would only report NOT_FOUND.
-    onSuccess: onGone,
+    onMutate: onLeaving,
+    onError: (_err, groupId) => onStay(groupId),
+    onSuccess: (_data, groupId) => onGone(groupId),
   });
   return (
     <Panel
@@ -1788,7 +1825,7 @@ function InviteAccept({
         >
           {t('Join', '加入')}
         </Button>
-        <Button className="h-9" disabled={decline.isPending} onClick={() => decline.mutate()}>
+        <Button className="h-9" disabled={decline.isPending} onClick={() => decline.mutate(group.group_id)}>
           {t('Decline', '拒绝')}
         </Button>
       </div>

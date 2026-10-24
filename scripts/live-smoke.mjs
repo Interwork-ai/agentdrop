@@ -5,10 +5,11 @@
  *   node scripts/live-smoke.mjs <target> [--expect-version X.Y.Z]
  *   pnpm smoke:live <target> --expect-version 0.5.2
  *
- * Runs after every deploy, before the deploy is reported done. Checks health, readiness, version and the hosted
- * CLI tarball over HTTP, then drives Chrome through the key journeys exactly as a person on that server would
- * (plain http stays a non-secure context, https a secure one). It only touches the QA accounts: A sends one drop
- * to B, B reads, stars and archives it. Credentials come from the private file described in
+ * Runs after every deploy, before the deploy is reported done. Checks health, readiness, version, the event stream
+ * (ADR 0040: its first frame must come through the server's proxy at once) and the hosted CLI tarball over HTTP,
+ * then drives Chrome through the key journeys exactly as a person on that server would (plain http stays a
+ * non-secure context, https a secure one). It only touches the QA accounts: A sends one drop to B,
+ * B reads, stars and archives it. Credentials come from the private file described in
  * scripts/lib/qa-accounts.mjs; create them once with `node scripts/qa-provision.mjs <target>`.
  */
 import { join, resolve } from 'node:path';
@@ -61,6 +62,11 @@ await httpCheck('health/live', async () => {
 await httpCheck('health/ready (database, storage)', async () => {
   const ready = await (await fetch(`${base}/health/ready`)).json();
   if (ready.status !== 'ready') throw new Error(JSON.stringify(ready));
+});
+await httpCheck('/.well-known/agentdrop lists the event stream', async () => {
+  const known = await (await fetch(`${base}/.well-known/agentdrop`)).json();
+  if (!Array.isArray(known.capabilities) || !known.capabilities.includes('events'))
+    throw new Error(JSON.stringify(known));
 });
 if (!args.includes('--no-tarball'))
   await httpCheck('hosted CLI tarball', async () => {
@@ -160,6 +166,36 @@ try {
     timeout: 20_000,
   });
   await b.step('inbox shows the drop from A', () => b.see(title, 20_000));
+  // The server writes a stream's first frame at once: a proxy that buffers the body never delivers it.
+  await b.step('the event stream comes through the proxy', async () => {
+    const frame = await b.page.evaluate(async () => {
+      const me = await (await fetch('/v1/me')).json();
+      const hId = me.endpoints?.find((e) => !e.revoked_at)?.h_id;
+      if (!hId) return 'no agent';
+      const stop = new AbortController();
+      const timer = setTimeout(() => stop.abort(), 10_000);
+      try {
+        const res = await fetch(`/v1/me/endpoints/${hId}/events`, {
+          headers: { accept: 'text/event-stream' },
+          signal: stop.signal,
+        });
+        const reader = res.body.getReader();
+        let text = '';
+        while (!text.includes('\n\n')) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          text += new TextDecoder().decode(value);
+        }
+        stop.abort();
+        return text;
+      } catch {
+        return 'no frame within 10 s';
+      } finally {
+        clearTimeout(timer);
+      }
+    });
+    if (!frame.includes('event: events')) throw new Error(frame.slice(0, 200));
+  });
   await b.step('open it', async () => {
     await b.page.getByText(title).first().click();
     await b.see('Automated post-deploy check. Safe to ignore.');

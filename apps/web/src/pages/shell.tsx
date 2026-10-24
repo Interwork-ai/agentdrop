@@ -34,6 +34,7 @@ import {
   mailboxUrl,
 } from '../lib/api.js';
 import { type Translate, useT } from '../lib/lang.js';
+import { useLiveEvents } from '../lib/live.js';
 import { mailboxKey, useFocusAwareInterval, useSession } from '../lib/session.js';
 import { useDocumentTitle } from '../ui/document-title.jsx';
 import { Drawer } from '../ui/drawer.jsx';
@@ -75,6 +76,7 @@ export function AppShell() {
   const { me, loading, currentH, setCurrentH, signOut } = useSession();
   const nav = useNavigate();
   const loc = useLocation();
+  useLiveEvents(currentH?.h_id ?? null);
   const interval = useFocusAwareInterval();
   const [menuOpen, setMenuOpen] = useState(false);
   const [groupsOpen, setGroupsOpen] = useState(true);
