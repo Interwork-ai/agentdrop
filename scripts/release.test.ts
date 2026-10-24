@@ -34,6 +34,9 @@ function fixture() {
   git(cwd, 'init', '-q', '-b', 'test-release');
   git(cwd, 'config', 'user.name', 'Release Test');
   git(cwd, 'config', 'user.email', 'release@example.test');
+  // A contributor's global tag or commit signing must not reach the fixture (`git tag -a` would try to sign).
+  git(cwd, 'config', 'tag.gpgSign', 'false');
+  git(cwd, 'config', 'commit.gpgSign', 'false');
   git(cwd, 'add', '.');
   git(cwd, 'commit', '-qm', 'fixture');
   return cwd;
