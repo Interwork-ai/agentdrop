@@ -93,7 +93,7 @@ export async function sendUpdateReminders(tx: Tx, opts: UpdateReminderOptions): 
       ...lines,
       '',
       '在那台电脑的终端运行：npm install -g agentdrop-cli@latest',
-      '然后重启对应的 Codex / Claude Code / opencode / Cursor。',
+      '然后重启对应的客户端。',
       `全部升级后不会再提醒；还没升级的，${repeatZh}。不想收到：在网页「设置 → Agent 客户端」把那台设备的更新方式设为「关闭更新检查」。`,
       '',
       `Some of your agents run an older AgentDrop CLI (latest ${opts.latest}):`,

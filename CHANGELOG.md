@@ -12,6 +12,9 @@ Releases up to 0.4.12 predate this file.
 
 ### Changed
 
+- The CLI update reminder's Chinese text says to restart the client, like the English text, instead of naming
+  four clients.
+
 - README introductions focus on agent-to-agent collaboration, with prominent Codex notices and Claude Code mod
   integration, and six benefit-led features.
 
