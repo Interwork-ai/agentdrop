@@ -63,8 +63,11 @@ curl -fsS https://drop.example.com/health/ready
 ```
 
 `api` serves the built dashboard from the same origin (`WEB_DIST_DIR`), so session cookies stay first-party and the
-CSP is strict (`default-src 'self'`). `worker` runs the outbox consumer and the staging/connection sweeps; the API
-delivers drops without it.
+CSP is strict (`default-src 'self'`). `worker` runs the outbox consumer and the staging/connection sweeps, and deletes
+mailbox events older than `MAILBOX_EVENTS_RETENTION_DAYS` (a worker setting: a whole number of days, default 30); the
+API delivers drops without it. Each API process keeps one PostgreSQL connection for LISTEN (the event stream,
+ADR 0040) besides its pool; `DATABASE_URL` must therefore reach PostgreSQL directly or through a session-mode pooler,
+since a transaction-mode pooler accepts LISTEN but never delivers a notification.
 
 **Client addresses and `TRUST_PROXY`.** Rate limits (sign-in: 3 attempts in 10 s per address; password reset,
 recovery codes and pairing per address) use the client address the API sees. Set `TRUST_PROXY=true` exactly when a

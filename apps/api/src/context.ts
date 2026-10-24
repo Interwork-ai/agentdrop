@@ -3,6 +3,7 @@ import type { FeishuAppConfig, SendOptions } from '@agentdrop/domain';
 import type { StorageProvider } from '@agentdrop/storage';
 import type { Auth } from './auth.js';
 import type { AppConfig } from './config.js';
+import type { EventHub } from './events.js';
 import type { Mailer } from './mail.js';
 
 export interface AppContext {
@@ -18,6 +19,8 @@ export interface AppContext {
   feishuFetch?: typeof fetch;
   /** The server's own Feishu app (ADR 0039); null or undefined when the operator configured none. */
   feishuApp?: FeishuAppConfig | null;
+  /** Wakes event-stream readers (ADR 0040). `buildApp` creates one per process when absent. */
+  events?: EventHub;
 }
 
 /** Where a person opens the dashboard: the browser origin when it differs from the API's public address. */

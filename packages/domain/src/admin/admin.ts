@@ -31,11 +31,12 @@ import {
   recipientRoutes,
   type Tx,
 } from '@agentdrop/db';
-import { and, eq, isNull, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { recordAudit } from '../audit.js';
 import { plaintextRemaining } from '../content/backfill.js';
 import { contentEncryptionStatus } from '../content/state.js';
 import { revokeEndpoint } from '../identity/endpoints.js';
+import { bumpDirectoryRevision } from '../identity/users.js';
 import { productHealth } from './product-health.js';
 
 /**
@@ -454,11 +455,28 @@ export async function adminCloseAccount(
 
   // 2. relationships in both directions, and group bindings that would keep delivering
   await tx.delete(contacts).where(eq(contacts.ownerUserId, userId));
-  await tx.delete(contacts).where(eq(contacts.peerUserId, userId));
+  const formerContacts = await tx
+    .delete(contacts)
+    .where(eq(contacts.peerUserId, userId))
+    .returning({ ownerUserId: contacts.ownerUserId });
   const memberships = await tx
-    .select({ id: groupMemberships.id, groupId: groupMemberships.groupId, role: groupMemberships.role })
+    .select({
+      id: groupMemberships.id,
+      groupId: groupMemberships.groupId,
+      role: groupMemberships.role,
+      status: groupMemberships.status,
+    })
     .from(groupMemberships)
     .where(eq(groupMemberships.userId, userId));
+  // The groups first, in id order, as every group operation locks its group before it touches people's rows.
+  const groupIds = [...new Set(memberships.map((m) => m.groupId))].sort();
+  if (groupIds.length > 0)
+    await tx
+      .select({ id: groups.id })
+      .from(groups)
+      .where(inArray(groups.id, groupIds))
+      .orderBy(groups.id)
+      .for('update');
   for (const m of memberships) {
     await tx
       .update(groupBindings)
@@ -505,6 +523,31 @@ export async function adminCloseAccount(
   await tx.delete(feishuCards).where(eq(feishuCards.userId, userId));
   await tx.delete(feishuLinkCodes).where(eq(feishuLinkCodes.userId, userId));
 
+  // Everyone whose contacts or groups just changed sees it on their event stream (ADR 0040): the people who had
+  // this account as a contact, and the members left in its groups (who may also have a new owner). One sorted bump,
+  // before the profile row below is touched, so people's rows are locked in id order like everywhere else.
+  const sharedGroups = [
+    ...new Set(
+      memberships.filter((m) => m.status === 'invited' || m.status === 'active').map((m) => m.groupId),
+    ),
+  ];
+  const coMembers = sharedGroups.length
+    ? await tx
+        .select({ userId: groupMemberships.userId })
+        .from(groupMemberships)
+        .where(
+          and(
+            inArray(groupMemberships.groupId, sharedGroups),
+            inArray(groupMemberships.status, ['invited', 'active']),
+          ),
+        )
+    : [];
+  await bumpDirectoryRevision(tx, [
+    userId,
+    ...formerContacts.map((c) => c.ownerUserId),
+    ...coMembers.map((m) => m.userId),
+  ]);
+
   // 4. the profile: the handle is retired (not recycled) so old references stay unambiguous
   await tx
     .update(appUsers)
@@ -518,7 +561,6 @@ export async function adminCloseAccount(
       suspendedAt: now,
       suspendedReason: null,
       deletedAt: now,
-      directoryRevision: sql`${appUsers.directoryRevision} + 1`,
       profileVersion: sql`${appUsers.profileVersion} + 1`,
       updatedAt: now,
     })

@@ -475,7 +475,11 @@ export const mailboxEvents = pgTable(
     payload: jsonb('payload').notNull().default({}),
     createdAt: ts('created_at').notNull().defaultNow(),
   },
-  (t) => [uniqueIndex('mailbox_events_h_revision_uq').on(t.hId, t.revision)],
+  (t) => [
+    uniqueIndex('mailbox_events_h_revision_uq').on(t.hId, t.revision),
+    /* Retention (ADR 0040): the worker deletes events older than a cutoff without scanning the table. */
+    index('mailbox_events_created_idx').on(t.createdAt),
+  ],
 );
 
 export const outboxEvents = pgTable(

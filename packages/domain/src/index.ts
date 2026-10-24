@@ -30,6 +30,7 @@ export * from './identity/users.js';
 export * from './mailbox/approvals.js';
 export * from './mailbox/attachments.js';
 export * from './mailbox/authorization.js';
+export * from './mailbox/events.js';
 export * from './mailbox/outbox.js';
 export * from './mailbox/read.js';
 export * from './mailbox/revision.js';

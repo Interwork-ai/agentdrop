@@ -7,6 +7,7 @@ import cors from '@fastify/cors';
 import fastifyStatic from '@fastify/static';
 import Fastify, { type FastifyInstance, type FastifyRequest } from 'fastify';
 import type { AppContext } from './context.js';
+import { EventHub } from './events.js';
 import { registerErrorHandler } from './plugins/errors.js';
 import { adminRoutes } from './routes/admin.js';
 import { approvalRoutes } from './routes/approvals.js';
@@ -71,9 +72,18 @@ function withRedaction(logger: boolean | object): boolean | object {
   };
 }
 
-export async function buildApp(ctx: AppContext, opts: BuildAppOptions = {}): Promise<FastifyInstance> {
+export async function buildApp(baseCtx: AppContext, opts: BuildAppOptions = {}): Promise<FastifyInstance> {
   // the fallback while no admin has set the group file space at runtime (ADR 0029)
-  configureGroupStorageQuota(ctx.config.GROUP_STORAGE_QUOTA_BYTES);
+  configureGroupStorageQuota(baseCtx.config.GROUP_STORAGE_QUOTA_BYTES);
+  let log: FastifyInstance['log'] | null = null;
+  const ctx: AppContext = {
+    ...baseCtx,
+    events:
+      baseCtx.events ??
+      new EventHub(baseCtx.config.DATABASE_URL, (err) =>
+        log?.warn({ err: err instanceof Error ? err.message : String(err) }, 'event listener error'),
+      ),
+  };
   const app = Fastify({
     logger: withRedaction(
       opts.logger ??
@@ -87,6 +97,13 @@ export async function buildApp(ctx: AppContext, opts: BuildAppOptions = {}): Pro
   });
 
   registerErrorHandler(app);
+  log = app.log;
+  // Only the hub this app created is stopped and closed here; one handed in belongs to the caller. Streams end in
+  // preClose, before the server waits for in-flight requests; the listener connection closes after them.
+  if (!baseCtx.events) {
+    app.addHook('preClose', async () => ctx.events?.stop());
+    app.addHook('onClose', async () => ctx.events?.close());
+  }
 
   await app.register(compress, { encodings: ['br', 'gzip'], threshold: 1024 });
   await app.register(cookie);

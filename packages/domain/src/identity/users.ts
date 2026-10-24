@@ -9,6 +9,7 @@ import {
 import { appUsers, authUsers, harnessEndpoints, type Tx } from '@agentdrop/db';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { recordAudit } from '../audit.js';
+import { notifyEventStreams } from '../mailbox/revision.js';
 import { addAssistantContact, ensureSystemAssistant } from './system-assistant.js';
 
 export interface AppUserRow {
@@ -104,12 +105,12 @@ export async function ensureAppUser(
 
 export async function updateDisplayName(tx: Tx, userId: string, raw: string): Promise<AppUserRow> {
   const displayName = validateDisplayName(raw);
+  await bumpDirectoryRevision(tx, [userId]);
   const [row] = await tx
     .update(appUsers)
     .set({
       displayName,
       profileVersion: sql`${appUsers.profileVersion} + 1`,
-      directoryRevision: sql`${appUsers.directoryRevision} + 1`,
       updatedAt: new Date(),
     })
     .where(eq(appUsers.id, userId))
@@ -130,12 +131,12 @@ export async function setPublicEmail(tx: Tx, userId: string, raw: string | null)
       throw new AgentDropError('VALIDATION_FAILED', 'invalid email address', { field: 'public_email' });
     publicEmail = parsed.data;
   }
+  await bumpDirectoryRevision(tx, [userId]);
   const [row] = await tx
     .update(appUsers)
     .set({
       publicEmail,
       profileVersion: sql`${appUsers.profileVersion} + 1`,
-      directoryRevision: sql`${appUsers.directoryRevision} + 1`,
       updatedAt: new Date(),
     })
     .where(eq(appUsers.id, userId))
@@ -163,13 +164,21 @@ export async function requirePairedAgent(tx: Tx, userId: string): Promise<void> 
   if (!live) throw new AgentDropError('AGENT_REQUIRED', 'pair an agent first');
 }
 
+/**
+ * Moves each person's `directory_revision`, which their event streams announce as `directory.changed` (ADR 0040),
+ * and wakes those streams once this transaction commits. Every write to the column goes through here (or, for a
+ * bulk update, notifies the same way), or open streams learn of the change only at their next timed re-read.
+ * Rows are updated in id order, so two transactions bumping the same people cannot deadlock.
+ */
 export async function bumpDirectoryRevision(tx: Tx, userIds: string[]): Promise<void> {
-  for (const id of [...new Set(userIds)].sort()) {
+  const ids = [...new Set(userIds)].sort();
+  for (const id of ids) {
     await tx
       .update(appUsers)
       .set({ directoryRevision: sql`${appUsers.directoryRevision} + 1` })
       .where(eq(appUsers.id, id));
   }
+  await notifyEventStreams(tx, ids);
 }
 
 function toRow(row: typeof appUsers.$inferSelect): AppUserRow {
@@ -194,6 +203,8 @@ function toRow(row: typeof appUsers.$inferSelect): AppUserRow {
 
 /** Controls whether every H owned by this account may read the account's full mailbox history. */
 export async function setCrossHMailboxEnabled(tx: Tx, userId: string, enabled: boolean): Promise<AppUserRow> {
+  // What lists show changes scope: open event streams wake now and find their cursor no longer fits (RESYNC_REQUIRED).
+  await bumpDirectoryRevision(tx, [userId]);
   const [row] = await tx
     .update(appUsers)
     .set({ crossHMailboxEnabled: enabled, updatedAt: new Date() })

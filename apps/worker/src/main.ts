@@ -13,6 +13,7 @@ import {
   initContentEncryption,
   requestBackfill,
   sendUpdateReminders,
+  sweepMailboxEvents,
 } from '@agentdrop/domain';
 import { FsStorage, S3Storage, type StorageProvider } from '@agentdrop/storage';
 import { and, isNull, sql } from 'drizzle-orm';
@@ -53,6 +54,8 @@ const config = z
       .optional()
       .transform((v) => v !== undefined && /^(1|true|yes)$/i.test(v)),
     STAGING_TTL_HOURS: z.coerce.number().int().positive().default(24),
+    /** Days mailbox events stay readable on the event stream (ADR 0040); older cursors get RESYNC_REQUIRED. */
+    MAILBOX_EVENTS_RETENTION_DAYS: z.coerce.number().int().positive().default(30),
     /** Where people open the dashboard; used for the link in Feishu notices. Optional: no link without it. */
     PUBLIC_BASE_URL: z.preprocess((v) => (v === '' ? undefined : v), z.string().url().optional()),
     WEB_ORIGIN: z.preprocess((v) => (v === '' ? undefined : v), z.string().url().optional()),
@@ -131,6 +134,15 @@ async function maintenance(): Promise<void> {
     .where(and(isNull(connections.closedAt), sql`${connections.lastSeenAt} < now() - interval '30 minutes'`))
     .returning({ id: connections.id });
   if (closed.length) log.info({ count: closed.length }, 'closed silent connections');
+  // Mailbox events back the event stream for a bounded window (ADR 0040); swept in batches, at most 20 per pass.
+  const eventsBefore = new Date(Date.now() - config.MAILBOX_EVENTS_RETENTION_DAYS * 86_400_000);
+  let swept = 0;
+  for (let pass = 0; pass < 20; pass++) {
+    const n = await withTx(db, (tx) => sweepMailboxEvents(tx, eventsBefore, EVENT_SWEEP_BATCH));
+    swept += n;
+    if (n < EVENT_SWEEP_BATCH) break;
+  }
+  if (swept) log.info({ count: swept }, 'swept old mailbox events');
   if (
     cliLatest &&
     config.UPDATE_REMINDER_DAYS.length > 0 &&
@@ -149,6 +161,7 @@ async function maintenance(): Promise<void> {
 }
 
 let lastReminderSweep = 0;
+const EVENT_SWEEP_BATCH = 5000;
 /** The CLI version this build ships (apps/cli/package.json next to this app), unless configured. */
 const cliLatest = config.CLI_LATEST_VERSION ?? shippedCliVersion();
 function shippedCliVersion(): string | undefined {

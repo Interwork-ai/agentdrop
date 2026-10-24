@@ -246,6 +246,13 @@
       "when": 1792897801027,
       "tag": "0034_feishu_app",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1792907831725,
+      "tag": "0035_mailbox_events_retention",
+      "breakpoints": true
     }
   ]
 }

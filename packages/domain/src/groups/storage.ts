@@ -14,6 +14,7 @@ import { getGroupStorageQuota } from '../admin/settings.js';
 import { recordAudit } from '../audit.js';
 import { remarksFor } from '../contacts/directory.js';
 import { openAttachmentMeta } from '../content/codec.js';
+import { hasValidGrant } from '../mailbox/authorization.js';
 import { enqueueOutbox } from '../mailbox/outbox.js';
 import { bumpMailboxes, type MailboxEventInput } from '../mailbox/revision.js';
 
@@ -226,8 +227,9 @@ export async function removeGroupFile(
 }
 
 /**
- * One mailbox event for every agent holding a delivery of, or having sent, a drop these files are linked to, so
- * open views refresh and show the file as removed.
+ * One mailbox event for every agent that may still read a drop these files are linked to (a delivery with a valid
+ * grant, AGENTS.md rule 4) or that sent it, so open views refresh and show the file as removed. Someone whose grant
+ * was revoked, such as a former group member, learns nothing about a drop they can no longer open.
  */
 export async function attachmentReaders(
   tx: Tx,
@@ -245,9 +247,12 @@ export async function attachmentReaders(
     .select({ hId: deliveries.hId, dropId: deliveries.dropId, deliveryId: deliveries.id })
     .from(deliveries)
     .where(
-      inArray(
-        deliveries.dropId,
-        linkedDrops.map((d) => d.id),
+      and(
+        inArray(
+          deliveries.dropId,
+          linkedDrops.map((d) => d.id),
+        ),
+        hasValidGrant(deliveries.id),
       ),
     );
   const events: MailboxEventInput[] = rows.map((r) => ({

@@ -41,7 +41,9 @@ record and set the old one's status to `Superseded by NNNN`. Link the record fro
 | [0032](0032-terminal-read-marks-read.md) | Reading a drop in a terminal marks it read | Accepted |
 | [0033](0033-own-group-posts-not-in-inbox.md) | What a person posts to a group stays out of their own inbox | Accepted |
 | [0034](0034-invitee-connected-on-first-pairing.md) | Someone who opened an invite link before pairing is connected once they pair | Accepted |
+| [0035](0035-operator-product-metrics.md) | The operator overview measures product health from metadata only | Accepted |
 | [0036](0036-account-recovery-without-email.md) | Getting back into an account from a paired device or a recovery code, without email or an administrator | Accepted |
 | [0037](0037-workbuddy-harness.md) | WorkBuddy as the sixth harness, configured from a static reading of its bundle | Accepted |
 | [0038](0038-reply-progress.md) | A reply can say where the asked-for work stands | Accepted |
 | [0039](0039-feishu-app-cards.md) | Feishu notices as cards from the server's own Feishu app, to a linked account | Accepted |
+| [0040](0040-resumable-per-person-event-stream.md) | Events are hints: a resumable per-person event stream | Accepted |

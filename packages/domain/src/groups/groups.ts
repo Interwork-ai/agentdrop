@@ -721,6 +721,8 @@ async function inviteInto(
       invited.push(t.userId);
     }
   }
+  // The owner and admins see a new request waiting for them on their event streams (ADR 0040).
+  const admins = toRequest.length > 0 ? await adminUserIds(tx, group.id) : [];
   if (toRequest.length > 0) {
     await tx.insert(groupJoinRequests).values(
       toRequest.map((t) => ({
@@ -729,7 +731,7 @@ async function inviteInto(
         invitedByUserId: actorUserId,
       })),
     );
-    for (const adminId of await adminUserIds(tx, group.id)) {
+    for (const adminId of admins) {
       await enqueueOutbox(tx, 'group.join_requested', group.id, {
         user_id: adminId,
         group_id: group.id,
@@ -743,7 +745,7 @@ async function inviteInto(
   }
   // Deliberately no bumpGroupVersion: an invitation changes no receiving endpoint, and the version is what
   // decideApproval compares, so bumping here would invalidate unrelated pending sends (STALE_APPROVAL).
-  await bumpDirectoryRevision(tx, [...alsoBump, ...invited]);
+  await bumpDirectoryRevision(tx, [...alsoBump, ...invited, ...admins]);
   await recordAudit(tx, {
     actorUserId,
     action: toInvite.length === 0 && toRequest.length > 0 ? 'group.invite_requested' : 'group.invite',
@@ -824,8 +826,13 @@ export async function decideJoinRequest(
       group_name: group.displayName,
       group_slug: group.slug,
     });
-    await bumpDirectoryRevision(tx, [inviteeUserId]);
   }
+  // The request leaves every admin's list, the member who asked sees it decided, and the invitee gets an invitation.
+  await bumpDirectoryRevision(tx, [
+    ...(await adminUserIds(tx, groupId)),
+    req.invitedByUserId,
+    ...(admits ? [inviteeUserId] : []),
+  ]);
   await recordAudit(tx, {
     actorUserId,
     action: decision === 'approve' ? 'group.request.approve' : 'group.request.reject',
@@ -846,6 +853,7 @@ export async function setInvitePolicy(
   await lockGroup(tx, groupId);
   await requireAdmin(tx, groupId, actorUserId);
   await tx.update(groups).set({ memberInvitePolicy: policy }).where(eq(groups.id, groupId));
+  await bumpDirectoryRevision(tx, await activeUserIds(tx, groupId));
   await recordAudit(tx, {
     actorUserId,
     action: 'group.policy',
@@ -860,7 +868,7 @@ export async function setInvitePolicy(
  * Whether members can read the group's earlier messages, including those from before they joined (ADR 0022).
  * Owner only: it decides what every later member may read, so an admin cannot widen (or narrow) it. Browser-only,
  * like the invite policy. Turning it off takes the history away again; drops delivered to a member stay theirs.
- * Nothing is delivered and nobody is notified either way.
+ * Nothing is delivered and nobody is notified either way; open views refresh through `directory.changed`.
  */
 export async function setHistoryVisible(
   tx: Tx,
@@ -874,6 +882,8 @@ export async function setHistoryVisible(
   if (m.role !== 'owner')
     throw new AgentDropError('FORBIDDEN', 'only the group owner can change who sees earlier messages');
   await tx.update(groups).set({ historyVisible: visible }).where(eq(groups.id, groupId));
+  // what every member may read changed: their views refresh (ADR 0040), with nothing delivered
+  await bumpDirectoryRevision(tx, await activeUserIds(tx, groupId));
   await recordAudit(tx, {
     actorUserId,
     action: 'group.history_visible',
@@ -1074,6 +1084,7 @@ export async function setMemberRole(
     .set({ role, version: sql`${groupMemberships.version} + 1` })
     .where(eq(groupMemberships.id, m.id));
   await bumpGroupVersion(tx, groupId);
+  await bumpDirectoryRevision(tx, await activeUserIds(tx, groupId));
   await recordAudit(tx, {
     actorUserId,
     action: 'group.role',
@@ -1102,6 +1113,7 @@ export async function transferOwnership(
     .update(groups)
     .set({ ownerUserId: userId, version: sql`${groups.version} + 1` })
     .where(eq(groups.id, groupId));
+  await bumpDirectoryRevision(tx, await activeUserIds(tx, groupId));
   await recordAudit(tx, {
     actorUserId,
     action: 'group.transfer',

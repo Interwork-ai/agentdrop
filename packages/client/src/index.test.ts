@@ -1,3 +1,4 @@
+import { getEventListeners } from 'node:events';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ApiClient } from './index.js';
 
@@ -129,5 +130,42 @@ describe('transport failure details', () => {
         new Response(null, { status: 301, headers: { location: 'https://drop.example.com/' } }),
     });
     await expect(client.healthLive()).rejects.toMatchObject({ code: 'INTERNAL', details: { status: 301 } });
+  });
+});
+
+/* A bridge passes one lifetime signal to every long-poll: a finished request must not stay attached to it. */
+describe("the caller's abort signal", () => {
+  const json = (status: number, body: unknown) =>
+    new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+
+  it('is let go once a request ends, whether it succeeded, was refused or never reached the server', async () => {
+    const answers: Array<() => Response> = [
+      () => json(200, { events: [], cursor: 'c2', has_more: false }),
+      () => json(410, { code: 'RESYNC_REQUIRED', message: 'stale', next_action: '', retryable: true }),
+      () => {
+        throw new TypeError('fetch failed');
+      },
+    ];
+    const lifetime = new AbortController();
+    for (const answer of answers) {
+      const client = new ApiClient({ baseUrl: 'https://example.test', fetch: async () => answer() });
+      await client.events({ cursor: 'c', wait: 1 }, lifetime.signal).catch(() => undefined);
+    }
+    expect(getEventListeners(lifetime.signal, 'abort')).toHaveLength(0);
+  });
+
+  it('still ends a request in flight when it aborts', async () => {
+    const lifetime = new AbortController();
+    const client = new ApiClient({
+      baseUrl: 'https://example.test',
+      fetch: (_url, init) =>
+        new Promise<Response>((_resolve, reject) =>
+          init?.signal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError'))),
+        ),
+    });
+    const pending = client.events({ cursor: 'c', wait: 25 }, lifetime.signal);
+    lifetime.abort();
+    await expect(pending).rejects.toMatchObject({ code: 'NETWORK_ERROR' });
+    expect(getEventListeners(lifetime.signal, 'abort')).toHaveLength(0);
   });
 });

@@ -9,6 +9,8 @@ import {
   type DirectoryLookupInput,
   type DirectoryLookupResult,
   type ErrorCode,
+  type EventsInput,
+  type EventsResult,
   type ExportInput,
   type groupCreateInputSchema,
   type groupInviteInputSchema,
@@ -89,6 +91,8 @@ export interface RequestOptions {
   rawBody?: BodyInit;
   /** Required by fetch when streaming a request body. */
   duplex?: 'half';
+  /** Ends the request early, e.g. a long-poll whose owner is shutting down. */
+  signal?: AbortSignal;
 }
 
 /**
@@ -157,6 +161,10 @@ export class ApiClient {
     }
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), opts.timeoutMs ?? this.timeoutMs);
+    // The caller's signal may outlive many requests (a bridge's lifetime): the listener goes when this one ends.
+    const onAbort = () => controller.abort();
+    if (opts.signal?.aborted) controller.abort();
+    else opts.signal?.addEventListener('abort', onAbort, { once: true });
     let res: Response;
     try {
       const init: RequestInit = { method, headers, signal: controller.signal, redirect: 'manual' };
@@ -164,6 +172,7 @@ export class ApiClient {
       res = await this.fetchImpl(url, init);
     } catch (err) {
       clearTimeout(timer);
+      opts.signal?.removeEventListener('abort', onAbort);
       const aborted = err instanceof Error && err.name === 'AbortError';
       throw new AgentDropError('NETWORK_ERROR', aborted ? 'request timed out' : 'network error', {
         cause: err instanceof Error ? err.message : String(err),
@@ -214,6 +223,7 @@ export class ApiClient {
       throw new AgentDropError('INTERNAL', `unexpected response ${res.status}`, { status: res.status });
     } finally {
       clearTimeout(timer);
+      opts.signal?.removeEventListener('abort', onAbort);
     }
   }
 
@@ -332,6 +342,14 @@ export class ApiClient {
   }
   listDrops(input: ListDropsInput): Promise<ListDropsResult> {
     return this.request('GET', '/v1/h/drops', { query: { ...input } });
+  }
+  /** The person's event stream, long-poll form (ADR 0040). The deadline covers the server-side wait. */
+  events(input: EventsInput, signal?: AbortSignal): Promise<EventsResult> {
+    return this.request('GET', '/v1/h/events', {
+      query: { ...input },
+      timeoutMs: ((input.wait ?? 0) + 15) * 1000,
+      ...(signal ? { signal } : {}),
+    });
   }
   readDrop(input: ReadDropInput, connectionId?: string | null): Promise<ReadDropResult> {
     const { drop_id, ...rest } = input;

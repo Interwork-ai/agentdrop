@@ -5,6 +5,7 @@ export * from './client-settings.js';
 export * from './directory.js';
 export * from './drop.js';
 export * from './errors.js';
+export * from './events.js';
 export * from './export.js';
 export * from './limits.js';
 export * from './manage.js';

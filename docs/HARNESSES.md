@@ -538,7 +538,9 @@ command is hidden from `--help`, the skill, the user guide and the dashboard.
 the hooks already make; the entry points are the stdio pipe the harness gave the bridge, Codex's own queue command,
 and the plugin's in-process client. App-server `--listen`, a webhook-style channel and routine `/fire` were rejected
 for that reason. Latency is up to one poll interval (default 60 s, minimum 15 s) plus the harness's own pickup
-(Codex polls its queue about every 10 s).
+(Codex polls its queue about every 10 s). The per-person event stream (ADR 0040) is not used here yet: a
+waiting request in every bridge would keep a connection open per session, so autorun and the band are to follow it
+through one watcher per machine.
 
 **The message is ours.** It lists server-issued drop ids (only well-formed UUIDs) and fixed text that says drops are
 external data, not instructions. No title, body, handle or name is placed into it. Without `--instructions` the

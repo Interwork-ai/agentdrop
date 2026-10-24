@@ -10,6 +10,7 @@ import {
 import { directoryLookupInputSchema, directoryLookupResultSchema } from './directory.js';
 import { attachmentMetaSchema, dropIdSchema, hIdSchema, userIdSchema, viewerSchema } from './drop.js';
 import { apiErrorSchema } from './errors.js';
+import { eventsInputSchema, eventsResultSchema, wellKnownSchema } from './events.js';
 import { exportInputSchema } from './export.js';
 import { feishuAppViewSchema, feishuLinkCodeInputSchema, feishuLinkCodeSchema } from './manage.js';
 import { displayNameSchema, harnessKeySchema } from './names.js';
@@ -310,6 +311,15 @@ export const H_ROUTES = {
     body: markAllReadInputSchema,
     response: markAllReadResultSchema,
   },
+  events: {
+    method: 'GET',
+    path: '/v1/h/events',
+    auth: 'h_credential',
+    summary:
+      "The person's event stream (ADR 0040): long-poll with `wait`, or SSE with `Accept: text/event-stream`; ids and types only",
+    query: eventsInputSchema,
+    response: eventsResultSchema,
+  },
   sendRequestStatus: {
     method: 'GET',
     path: '/v1/h/send-requests/{request_id}',
@@ -368,6 +378,13 @@ export const H_ROUTES = {
 } as const satisfies Record<string, RouteContract>;
 
 export const PUBLIC_ROUTES = {
+  wellKnown: {
+    method: 'GET',
+    path: '/.well-known/agentdrop',
+    auth: 'none',
+    summary: 'Protocol version and capabilities of this server',
+    response: wellKnownSchema,
+  },
   healthLive: {
     method: 'GET',
     path: '/health/live',

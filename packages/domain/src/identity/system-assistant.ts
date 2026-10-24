@@ -13,12 +13,14 @@ import {
   sendRequests,
   type Tx,
 } from '@agentdrop/db';
-import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, type SQL, sql } from 'drizzle-orm';
 import { recordAudit } from '../audit.js';
 import { canSendTo } from '../contacts/contacts.js';
 import { ensureAutoRoute } from '../contacts/routes.js';
 import { openAttachmentMeta, openDrop } from '../content/codec.js';
+import { EVENTS_CHANNEL } from '../mailbox/revision.js';
 import { SYSTEM_DROP_TTL_MS, sendDrop } from '../mailbox/send.js';
+import { bumpDirectoryRevision } from './users.js';
 
 /**
  * The built-in test contact @agentdrop ("AgentDrop Assistant"). Every account starts with it as an accepted contact
@@ -176,12 +178,12 @@ async function renameLegacyAssistant(tx: Tx, assistant: SystemAssistant): Promis
     .set({
       displayName: SYSTEM_ASSISTANT_NAME,
       profileVersion: sql`${appUsers.profileVersion} + 1`,
-      directoryRevision: sql`${appUsers.directoryRevision} + 1`,
       updatedAt: new Date(),
     })
     .where(and(eq(appUsers.id, assistant.userId), eq(appUsers.displayName, LEGACY_ASSISTANT_NAME)))
     .returning({ id: appUsers.id });
   if (renamed.length === 0) return;
+  await bumpDirectoryRevision(tx, [assistant.userId]);
   await tx
     .update(harnessEndpoints)
     .set({ label: SYSTEM_ASSISTANT_NAME })
@@ -190,9 +192,21 @@ async function renameLegacyAssistant(tx: Tx, assistant: SystemAssistant): Promis
     .update(authUsers)
     .set({ name: SYSTEM_ASSISTANT_NAME })
     .where(eq(authUsers.id, SYSTEM_AUTH_USER_ID));
+  await bumpDirectoryRevisionWhere(
+    tx,
+    sql`id in (select owner_user_id from ${contacts} where peer_user_id = ${assistant.userId}::uuid)`,
+  );
+}
+
+/**
+ * The bulk form of bumpDirectoryRevision for every account at once: one update, and one notification per moved row
+ * from its own `returning` set, so the event streams of everyone affected wake (ADR 0040).
+ */
+async function bumpDirectoryRevisionWhere(tx: Tx, where: SQL): Promise<void> {
   await tx.execute(sql`
-    update ${appUsers} set directory_revision = directory_revision + 1
-    where id in (select owner_user_id from ${contacts} where peer_user_id = ${assistant.userId}::uuid)`);
+    with moved as (
+      update ${appUsers} set directory_revision = directory_revision + 1 where ${where} returning id)
+    select pg_notify(${EVENTS_CHANNEL}, moved.id::text) from moved`);
 }
 
 /** Adds the assistant as an accepted contact (both directions) of every open account. Skips existing rows. */
@@ -207,12 +221,7 @@ export async function backfillAssistantContacts(tx: Tx, assistantUserId: string)
     on conflict (owner_user_id, peer_user_id) do nothing
     returning owner_user_id`);
   const owners = [...new Set(inserted.rows.map((r) => r.owner_user_id))];
-  if (owners.length > 0) {
-    await tx
-      .update(appUsers)
-      .set({ directoryRevision: sql`${appUsers.directoryRevision} + 1` })
-      .where(inArray(appUsers.id, owners));
-  }
+  if (owners.length > 0) await bumpDirectoryRevisionWhere(tx, inArray(appUsers.id, owners));
   return inserted.rows.length;
 }
 

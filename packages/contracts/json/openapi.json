@@ -19,6 +19,122 @@
     }
   },
   "paths": {
+    "/.well-known/agentdrop": {
+      "get": {
+        "summary": "Protocol version and capabilities of this server",
+        "security": [],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "protocol": {
+                      "type": "string",
+                      "const": "agentdrop/v1"
+                    },
+                    "server_version": {
+                      "type": "string"
+                    },
+                    "capabilities": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "protocol",
+                    "server_version",
+                    "capabilities"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "UNAUTHORIZED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "VALIDATION_FAILED",
+                        "PAYLOAD_TOO_LARGE",
+                        "IDEMPOTENCY_CONFLICT",
+                        "VERSION_CONFLICT",
+                        "NO_DELIVERY_ROUTE",
+                        "PREFERRED_ROUTE_UNAVAILABLE",
+                        "ROUTE_UNAVAILABLE",
+                        "GROUP_RECIPIENT_UNAVAILABLE",
+                        "TOO_MANY_RECIPIENTS",
+                        "AMBIGUOUS_TARGET",
+                        "NOT_A_CONTACT",
+                        "BLOCKED",
+                        "ATTACHMENT_NOT_READY",
+                        "ATTACHMENT_NOT_OWNED",
+                        "PATH_NOT_ALLOWED",
+                        "FILE_TOO_LARGE",
+                        "QUOTA_EXCEEDED",
+                        "GROUP_STORAGE_FULL",
+                        "FILE_REMOVED",
+                        "NEEDS_APPROVAL",
+                        "STALE_APPROVAL",
+                        "APPROVAL_EXPIRED",
+                        "RESYNC_REQUIRED",
+                        "ACCOUNT_SUSPENDED",
+                        "SIGNUP_DISABLED",
+                        "ENDPOINT_REVOKED",
+                        "AGENT_REQUIRED",
+                        "RATE_LIMITED",
+                        "UPSTREAM_UNAVAILABLE",
+                        "NETWORK_ERROR",
+                        "INTERNAL"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "next_action": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "details": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "next_action",
+                    "retryable"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/health/live": {
       "get": {
         "summary": "Process liveness",
@@ -5862,6 +5978,198 @@
                   }
                 },
                 "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/h/events": {
+      "get": {
+        "summary": "The person's event stream (ADR 0040): long-poll with `wait`, or SSE with `Accept: text/event-stream`; ids and types only",
+        "security": [
+          {
+            "hCredential": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 8192
+            }
+          },
+          {
+            "name": "wait",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 25
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500
+            }
+          },
+          {
+            "name": "endpoint_scope",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "account",
+                "current"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "events": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "delivery.created",
+                              "delivery.state",
+                              "grant.revoked",
+                              "drop.revoked",
+                              "attachment.removed",
+                              "directory.changed"
+                            ]
+                          },
+                          "drop_id": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "uuid",
+                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "type",
+                          "drop_id"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "cursor": {
+                      "type": "string"
+                    },
+                    "has_more": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "events",
+                    "cursor",
+                    "has_more"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "UNAUTHORIZED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "VALIDATION_FAILED",
+                        "PAYLOAD_TOO_LARGE",
+                        "IDEMPOTENCY_CONFLICT",
+                        "VERSION_CONFLICT",
+                        "NO_DELIVERY_ROUTE",
+                        "PREFERRED_ROUTE_UNAVAILABLE",
+                        "ROUTE_UNAVAILABLE",
+                        "GROUP_RECIPIENT_UNAVAILABLE",
+                        "TOO_MANY_RECIPIENTS",
+                        "AMBIGUOUS_TARGET",
+                        "NOT_A_CONTACT",
+                        "BLOCKED",
+                        "ATTACHMENT_NOT_READY",
+                        "ATTACHMENT_NOT_OWNED",
+                        "PATH_NOT_ALLOWED",
+                        "FILE_TOO_LARGE",
+                        "QUOTA_EXCEEDED",
+                        "GROUP_STORAGE_FULL",
+                        "FILE_REMOVED",
+                        "NEEDS_APPROVAL",
+                        "STALE_APPROVAL",
+                        "APPROVAL_EXPIRED",
+                        "RESYNC_REQUIRED",
+                        "ACCOUNT_SUSPENDED",
+                        "SIGNUP_DISABLED",
+                        "ENDPOINT_REVOKED",
+                        "AGENT_REQUIRED",
+                        "RATE_LIMITED",
+                        "UPSTREAM_UNAVAILABLE",
+                        "NETWORK_ERROR",
+                        "INTERNAL"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "next_action": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "details": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "next_action",
+                    "retryable"
+                  ],
+                  "additionalProperties": false
+                }
               }
             }
           }

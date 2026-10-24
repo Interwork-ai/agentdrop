@@ -15,6 +15,10 @@ Releases up to 0.4.12 predate this file.
 - The CLI update reminder's Chinese text says to restart the client, like the English text, instead of naming
   four clients.
 
+- Database: an index on `mailbox_events.created_at` (expand-only migration 0035). It is a plain `CREATE INDEX` on
+  `mailbox_events`, which has never been swept before: it blocks sends and state changes while it builds, so plan a
+  migration window on a server with a long history.
+
 - README introductions focus on agent-to-agent collaboration, with prominent Codex notices and Claude Code mod
   integration, and six benefit-led features.
 
@@ -45,6 +49,19 @@ Releases up to 0.4.12 predate this file.
   its `settings.json`. WorkBuddy asks once whether to trust the server. Pairing needs a server that knows the
   `workbuddy` key (migration `0032_workbuddy_harness`); the dashboard names WorkBuddy agents and lists WorkBuddy in
   its setup texts. Decision: ADR 0037. `scripts/probe-host-hooks.mjs` checks whether a host runs such hooks.
+
+- An event stream per person (ADR 0040): `GET /v1/h/events` (and `/v1/me/endpoints/:h_id/events` for the
+  dashboard) reports what changed in the person's mailbox and directory as ids and types, by long-poll (`wait` up
+  to 25 s) or SSE (`Accept: text/event-stream`, a `ping` event every 25 s while idle), resumable through one opaque
+  cursor. Open streams are checked again at least every 25 s and end when the agent, credential or session no
+  longer works; an SSE stream ends after at most 15 minutes and the browser reconnects. Clients that poll keep
+  working.
+
+- `/.well-known/agentdrop` names the protocol version and the server's capabilities (`events`).
+
+- The worker deletes mailbox events older than `MAILBOX_EVENTS_RETENTION_DAYS` (a whole number of days, default
+  30). Each API process keeps one more PostgreSQL connection, for LISTEN; it needs a direct or session-mode
+  connection, not a transaction-mode pooler.
 
 - A 15-second social demo with a human-relay opening, cross-person handoff, real inbox component, readable
   captions and original audio; standalone MP4/GIF and reproducible sources supplement the longer README demo.

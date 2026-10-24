@@ -20,7 +20,7 @@ implementation for the web.
 | Package | Responsibility | Must not import |
 |---|---|---|
 | `packages/contracts` | Zod schemas → JSON Schema / OpenAPI, error codes with `next_action` (written for the calling agent; the dashboard maps codes to its own Chinese text), limits, name rules | anything app-specific |
-| `packages/db` | Drizzle schema, migrations, `withTx` | domain |
+| `packages/db` | Drizzle schema, migrations, `withTx`, the LISTEN helper (`listen.ts`) | domain |
 | `packages/domain` | rules and use-cases (identity, contacts, directory, send, read, approvals, groups, attachments) | MCP, React, Codex/Claude specifics |
 | `packages/security` | path allowlist, sensitive-file rules, review hints, safe names | db |
 | `packages/storage` | `StorageProvider`: FsStorage (dev), S3Storage (prod) | db |
@@ -70,7 +70,8 @@ drops (immutable body, author snapshot, target snapshot, content hash)
         └─ delivery_grants (why this H may read: direct via route_id | group via membership+binding; revocable)
 send_requests (unique (origin_h_id, request_id): idempotency + stored result)
 approvals (pending human decision: envelope, content hash, private endpoint snapshot, origin_kind)
-mailbox_heads / mailbox_events (per-H revision, for refresh and future incremental sync)
+mailbox_heads / mailbox_events (per-H revision and ordered events; they back the per-person event stream for the
+retention window, ADR 0040)
 attachments ─ drop_attachments (an attachment belongs to at most one drop)
 outbox_events (derived side effects only)
 audit_events (ids, actions, sizes; never content)
@@ -234,6 +235,17 @@ reachable by a human at a terminal or through the dashboard session.
 - Mailbox revisions: `mailbox_heads` rows are locked in ascending `h_id` order and incremented per event.
 - Cursors: keyset `(received_at, id)` plus a scope hash of `(h_id, view, filters)`; a cursor from another view or H is
   `RESYNC_REQUIRED`.
+- Event stream (ADR 0040): `mailbox_events` and `directory_revision` back one resumable stream per person
+  (`/v1/h/events`, `/v1/me/endpoints/:h_id/events`), long-poll or SSE behind one opaque cursor (compact binary:
+  per-agent revisions, `directory_revision`, a tag binding it to person and scope). Each agent is read through the
+  `(h_id, revision)` index and the rows merged by id; a gap in an agent's revisions (retention), a cursor ahead of
+  the server or one from another scope is `RESYNC_REQUIRED`. `bumpMailboxes` writes events in input order, so the
+  copies of one change for a person's agents are adjacent and coalesce. Events carry ids and types only. The
+  writing transaction calls `pg_notify` once per affected person; each API process holds one LISTEN connection
+  (`EventHub`, `apps/api/src/events.ts`; TCP keepalive and a `SELECT 1` every 30 s reconnect a silently dropped
+  one), and a missed wake-up costs at most one wait period. An open stream re-runs the credential or session check
+  before each batch and at least every 25 s, pings when idle for 25 s, stops reading for a client that lags and
+  cuts it off after 25 s, and ends after 15 minutes. The worker sweeps events past the retention window.
 - Dashboard: 10 s refetch while visible (60 s hidden); query keys include `h_id`; switching H drops the cache.
 - Worker: `outbox_events` claimed with `FOR UPDATE SKIP LOCKED` and a lease; exponential backoff; dead-letter after
   8 attempts; handlers are idempotent. Delivery never waits for it.
