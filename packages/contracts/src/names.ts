@@ -70,7 +70,15 @@ export const groupSlugSchema = z
   .regex(/^[a-z0-9][a-z0-9_-]*$/, 'group slug: lowercase letters, digits, dash, underscore');
 
 /** Which agent product an owned paired endpoint runs. Never disclosed for other people's endpoints. */
-export const harnessKeySchema = z.enum(['codex', 'claude-code', 'other', 'opencode', 'cursor', 'omp']);
+export const harnessKeySchema = z.enum([
+  'codex',
+  'claude-code',
+  'other',
+  'opencode',
+  'cursor',
+  'omp',
+  'workbuddy',
+]);
 export type HarnessKey = z.infer<typeof harnessKeySchema>;
 
 /**

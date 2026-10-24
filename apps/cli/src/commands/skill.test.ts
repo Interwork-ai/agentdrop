@@ -57,6 +57,7 @@ describe('complete bundled skill synchronization', () => {
     vi.stubEnv('XDG_CONFIG_HOME', join(root, 'config'));
     vi.stubEnv('HOME', join(root, 'home'));
     vi.stubEnv('PI_CODING_AGENT_DIR', join(root, 'omp', 'agent'));
+    vi.stubEnv('WORKBUDDY_CONFIG_DIR', join(root, 'workbuddy'));
     target = { client: 'codex', dir: join(root, 'codex', 'skills', 'agentdrop') };
     write('SKILL.md', 'original');
     write('reference/workflows.md', 'workflow');
@@ -144,13 +145,14 @@ describe('complete bundled skill synchronization', () => {
       join(root, 'config/opencode/skills/agentdrop'),
       join(root, 'home/.cursor/skills/agentdrop'),
       join(root, 'omp/agent/skills/agentdrop'),
+      join(root, 'workbuddy/skills/agentdrop'),
     ]);
     for (const item of targets) mkdirSync(dirname(dirname(item.dir)), { recursive: true });
     const unrelated = join(root, 'codex/skills/other');
     mkdirSync(unrelated, { recursive: true });
     writeFileSync(join(unrelated, 'SKILL.md'), 'leave alone');
     const result = ensureBundledSkills({ source, version: '1.0.0' });
-    expect(result.installed.filter((i) => i.status === 'installed')).toHaveLength(5);
+    expect(result.installed.filter((i) => i.status === 'installed')).toHaveLength(6);
     for (const item of targets) {
       for (const path of ['SKILL.md', 'reference/workflows.md', 'scripts/check.sh', 'assets/icon.svg'])
         expect(readFileSync(join(item.dir, path), 'utf8')).toBe(readFileSync(join(source, path), 'utf8'));
@@ -162,6 +164,7 @@ describe('complete bundled skill synchronization', () => {
     expect(existsSync(join(root, 'codex'))).toBe(false);
     expect(existsSync(join(root, 'home/.cursor'))).toBe(false);
     expect(existsSync(join(root, 'omp'))).toBe(false);
+    expect(existsSync(join(root, 'workbuddy'))).toBe(false);
   });
   it('skill install without --only installs only for harnesses on this machine, creating no other roots', async () => {
     mkdirSync(join(root, 'codex'), { recursive: true });
@@ -169,7 +172,7 @@ describe('complete bundled skill synchronization', () => {
     expect(existsSync(join(root, 'codex/skills/agentdrop/SKILL.md'))).toBe(true);
     // on PATH: the person has it even before its config folder exists
     expect(existsSync(join(root, 'claude/skills/agentdrop/SKILL.md'))).toBe(true);
-    for (const absent of ['omp', 'home/.cursor', 'config/opencode'])
+    for (const absent of ['omp', 'home/.cursor', 'config/opencode', 'workbuddy'])
       expect(existsSync(join(root, absent))).toBe(false);
     // --only is an explicit choice and still installs where asked
     await skillInstallCommand(output, { only: ['omp'], which: () => null });

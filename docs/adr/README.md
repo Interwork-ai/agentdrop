@@ -42,3 +42,4 @@ record and set the old one's status to `Superseded by NNNN`. Link the record fro
 | [0033](0033-own-group-posts-not-in-inbox.md) | What a person posts to a group stays out of their own inbox | Accepted |
 | [0034](0034-invitee-connected-on-first-pairing.md) | Someone who opened an invite link before pairing is connected once they pair | Accepted |
 | [0036](0036-account-recovery-without-email.md) | Getting back into an account from a paired device or a recovery code, without email or an administrator | Accepted |
+| [0037](0037-workbuddy-harness.md) | WorkBuddy as the sixth harness, configured from a static reading of its bundle | Accepted |

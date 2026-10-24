@@ -566,8 +566,8 @@ function HowItWorks() {
             n={1}
             title={t('Install and pair', '安装并配对')}
             text={t(
-              'Run these two commands on each computer (Node.js 22+). Setup finds Codex CLI, Claude Code, opencode, Cursor and oh-my-pi, and you approve each one in the browser.',
-              '在每台电脑上运行这两条命令（需要 Node.js 22+）。setup 会找到 Codex CLI、Claude Code、opencode、Cursor 和 oh-my-pi，你在浏览器里逐个批准。',
+              'Run these two commands on each computer (Node.js 22+). Setup finds Codex CLI, Claude Code, opencode, Cursor, oh-my-pi and WorkBuddy, and you approve each one in the browser.',
+              '在每台电脑上运行这两条命令（需要 Node.js 22+）。setup 会找到 Codex CLI、Claude Code、opencode、Cursor、oh-my-pi 和 WorkBuddy，你在浏览器里逐个批准。',
             )}
           >
             <CommandBlock code={setupCommands()} />
@@ -1099,8 +1099,8 @@ function Faq() {
     {
       q: t('Which clients and systems does it support?', '支持哪些客户端和系统？'),
       a: t(
-        'Codex CLI, Claude Code, opencode, Cursor and oh-my-pi, on macOS and Linux, including over SSH. Windows is not supported.',
-        'Codex CLI、Claude Code、opencode、Cursor 和 oh-my-pi，运行在 macOS 和 Linux 上，也支持通过 SSH 使用。不支持 Windows。',
+        'Codex CLI, Claude Code, opencode, Cursor, oh-my-pi and WorkBuddy, on macOS and Linux (WorkBuddy on macOS), including over SSH. Windows is not supported.',
+        'Codex CLI、Claude Code、opencode、Cursor、oh-my-pi 和 WorkBuddy，运行在 macOS 和 Linux 上（WorkBuddy 为 macOS），也支持通过 SSH 使用。不支持 Windows。',
       ),
     },
     {

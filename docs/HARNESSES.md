@@ -31,7 +31,7 @@ An older server's explicit group source stays classified as a group even when th
 creates a guessed group address. Group replies in the mod retain their group label and mention indication, while
 the Read prompt carries only the validated handle and drop id, never the external group name or title.
 
-## User-prompt context (Codex / Claude Code / omp)
+## User-prompt context (Codex / Claude Code / omp / WorkBuddy)
 
 Connect now installs both the existing human-facing `Stop` notice and a `UserPromptSubmit` hook. The latter runs
 `agentdrop pending --profile X --in-hook --hook-output prompt-context`, freshly queries the current H, and returns
@@ -62,6 +62,7 @@ is not implemented for them in this change, rather than treating their different
 | Claude Code | `session_id` + `transcript_path`; additional context stays in the session | full list at the first prompt, again on any change, otherwise one line |
 | Codex | `session_id` + `transcript_path` (a subagent has its own transcript) | same |
 | oh-my-pi (omp) | `session_id` only; the context is appended to each model call and never saved | full list every prompt (it never piles up there) |
+| WorkBuddy | Claude Code's hook input (embedded CodeBuddy CLI); not yet seen in a live session | as Claude Code |
 | Cursor, opencode | no prompt-time context | — |
 
 The record is one file per session under the CLI state directory (`model-context/`: item hashes, a fingerprint, a
@@ -130,7 +131,7 @@ Known asymmetries to keep in mind:
 
 ## Shared core and host adapters
 
-All five clients run the same `agentdrop mcp --profile X` bridge. MCP tools, typed HTTP requests, authorization,
+All six clients run the same `agentdrop mcp --profile X` bridge. MCP tools, typed HTTP requests, authorization,
 mailboxes, attachments, device preferences and CLI updates use shared implementations. Host adapters cover discovery,
 MCP configuration, skill paths and compatible notifications; they do not implement separate messaging rules.
 `cursor` and `opencode` are distinct pairing identities, with default public routes `@user/cursor` and
@@ -251,6 +252,34 @@ profiles (`OMP_PROFILE`, `~/.omp/profiles/<name>/agent`) are not supported yet.
 Sources: [oh-my-pi docs at v18.2.5](https://github.com/can1357/oh-my-pi/tree/v18.2.5/docs) (`mcp-config.md`,
 `extensions.md`, `extension-loading.md`, `skills.md`, `environment-variables.md`) and `packages/coding-agent/src`
 at that tag.
+
+### WorkBuddy
+
+`agentdrop setup --server <url> --harness workbuddy` (or `agentdrop connect workbuddy --profile workbuddy`) pairs a
+`workbuddy` identity (default address `@user/workbuddy`), writes `mcpServers.agentdrop` into `<home>/mcp.json`, installs
+the shared skill into `<home>/skills/agentdrop`, and writes the same Stop, UserPromptSubmit and SessionStart command
+hooks as Claude Code into `<home>/settings.json`. `<home>` is `WORKBUDDY_CONFIG_DIR` when set, otherwise `~/.workbuddy`
+(China edition) or, when only it exists, `~/.workbuddy-ai` (international edition, "WorkBuddy AI"); with both
+installed the China edition is connected. WorkBuddy is a desktop app with nothing on PATH, so detection is the home
+directory alone. A server before this release does not know the `workbuddy` key; `setup` then sets up the other
+harnesses and says the server needs an update (ADR 0037).
+
+The facts below come from a static reading of the macOS bundles of WorkBuddy 5.8.3 (China) and WorkBuddy AI 5.8.4
+(international) and of `@tencent-ai/codebuddy-code` 2.175.0; nothing in them was run. Both bundles embed a reduced
+CodeBuddy Code CLI (`cli/dist/codebuddy-lite-wb.mjs`) with its home directory moved, so WorkBuddy follows the
+CodeBuddy CLI's rules. Not yet seen in a live WorkBuddy session: `scripts/probe-host-hooks.mjs` checks which hooks
+run there and whether their messages show.
+
+| Fact (WorkBuddy 5.8.3 / 5.8.4) | Consequence for us |
+|---|---|
+| The app sets `CODEBUDDY_CONFIG_DIR` and `WORKBUDDY_CONFIG_DIR` to `WORKBUDDY_CONFIG_DIR \|\| CODEBUDDY_CONFIG_DIR \|\| ~/<dataFolderName>`; `product.json` names `.workbuddy` (China) or `.workbuddy-ai` (international, `isOversea`) | one home per edition, by edition and not by version; `CODEBUDDY_CONFIG_DIR` in a shell usually means the standalone CLI, so only `WORKBUDDY_CONFIG_DIR` overrides |
+| The app's MCP provider reads and writes `<home>/mcp.json` (`mcpServers.<name>` with `type`, `command`, `args`, `env`); the embedded CLI takes the first of `<home>/.mcp.json`, `<home>/mcp.json` | the shared JSON writer into `mcp.json`, and into `.mcp.json` too when that file exists; other servers and keys stay |
+| A server added in the file starts untrusted (`trust-pending`) until the person allows it; approvals are kept in `<home>/mcp-approvals.json` | connect never writes an approval (that consent is the person's); it says to allow agentdrop once when WorkBuddy asks |
+| User skills: `<home>/skills/<name>/SKILL.md` | the shared skill goes there |
+| Hooks: Claude Code's `{"hooks": {"<Event>": [{"matcher", "hooks": [{"type": "command", "command", "timeout"}]}]}}` in `<home>/settings.json`; events include SessionStart, UserPromptSubmit and Stop | the Claude Code hook writer and hook repair, unchanged |
+| A hook's `systemMessage` (or `reason`) is inserted into the conversation as a hook message and kept out of the model (CodeBuddy 2.166.0 fixed it leaking into context) | the person's notice shows in the conversation, not as a toast |
+| `hookSpecificOutput.additionalContext` from SessionStart (first prompt or resume) and UserPromptSubmit is wrapped as a reminder and given to the model | the model's prompt context works as in Claude Code (ADR 0031) |
+| The app starts its CLI with `CODEBUDDY_DISABLE_EXTENDED_PLUGIN_HOOKS=1`; whether its security centre turns user hooks or custom MCP off by default is a cloud setting | plugin hooks are not used; a person whose WorkBuddy has custom MCP switched off must switch it on |
 
 ## One core notice, four framings
 

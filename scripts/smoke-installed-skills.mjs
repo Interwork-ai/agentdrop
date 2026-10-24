@@ -25,6 +25,7 @@ const targets = [
   join(sandbox, 'xdg', 'opencode', 'skills', 'agentdrop'),
   join(sandbox, 'home', '.cursor', 'skills', 'agentdrop'),
   join(sandbox, 'omp', 'agent', 'skills', 'agentdrop'),
+  join(sandbox, 'workbuddy', 'skills', 'agentdrop'),
 ];
 const env = {
   ...process.env,
@@ -33,6 +34,7 @@ const env = {
   CLAUDE_CONFIG_DIR: join(sandbox, 'claude'),
   XDG_CONFIG_HOME: join(sandbox, 'xdg'),
   PI_CODING_AGENT_DIR: join(sandbox, 'omp', 'agent'),
+  WORKBUDDY_CONFIG_DIR: join(sandbox, 'workbuddy'),
   AGENTDROP_CONFIG_DIR: join(sandbox, 'config'),
   AGENTDROP_STATE_DIR: join(sandbox, 'state'),
   AGENTDROP_DATA_DIR: join(sandbox, 'data'),

@@ -63,8 +63,8 @@ export function HelpPage() {
         <article className="min-w-0 max-w-3xl flex-1 space-y-10 pb-16">
           <p className="text-base leading-7 text-fg-2">
             {t(
-              'AgentDrop lets your agents (Codex CLI, Claude Code, opencode, Cursor and oh-my-pi) hand work to each other and to other people, with a record you can check later.',
-              'AgentDrop 让你的 Agent（Codex CLI、Claude Code、opencode、Cursor 和 oh-my-pi）互相、以及和别人的 Agent 之间交接工作，并留下可查的记录。',
+              'AgentDrop lets your agents (Codex CLI, Claude Code, opencode, Cursor, oh-my-pi and WorkBuddy) hand work to each other and to other people, with a record you can check later.',
+              'AgentDrop 让你的 Agent（Codex CLI、Claude Code、opencode、Cursor、oh-my-pi 和 WorkBuddy）互相、以及和别人的 Agent 之间交接工作，并留下可查的记录。',
             )}
           </p>
           {/* below lg the contents are a disclosure at the top instead of a sidebar */}
@@ -128,8 +128,8 @@ export function HelpPage() {
             <List
               items={[
                 t(
-                  'setup detects Codex, Claude Code, Cursor, OpenCode and oh-my-pi (omp) and opens your browser once per tool: check the device and agent names, then click "Approve".',
-                  'setup 会检测 Codex、Claude Code、Cursor、OpenCode 和 oh-my-pi（omp），每个工具打开一次浏览器：核对设备名和 Agent 名后点「批准」。',
+                  'setup detects Codex, Claude Code, Cursor, OpenCode, oh-my-pi (omp) and WorkBuddy and opens your browser once per tool: check the device and agent names, then click "Approve".',
+                  'setup 会检测 Codex、Claude Code、Cursor、OpenCode、oh-my-pi（omp）和 WorkBuddy，每个工具打开一次浏览器：核对设备名和 Agent 名后点「批准」。',
                 ),
                 t(
                   'It installs everything the agent needs (MCP tools, the skill, end-of-turn notices) and finishes with a self-check. Restart the clients afterwards.',
@@ -323,15 +323,15 @@ export function HelpPage() {
           <Section {...sectionProps('notifications', 8)}>
             <P>
               {t(
-                'Every item is shown to you once inside your agent, at a moment you are there: when you send a message or start a session in Codex, Claude Code or oh-my-pi. It then stays quiet in all your other sessions.',
-                '每条消息都会在你用 Agent 时让你看到一次，而且是在你确定在场的时候：你在 Codex、Claude Code 或 oh-my-pi 里发一句话、或开一个会话时。之后在你别的会话里不再重复。',
+                'Every item is shown to you once inside your agent, at a moment you are there: when you send a message or start a session in Codex, Claude Code, oh-my-pi or WorkBuddy. It then stays quiet in all your other sessions.',
+                '每条消息都会在你用 Agent 时让你看到一次，而且是在你确定在场的时候：你在 Codex、Claude Code、oh-my-pi 或 WorkBuddy 里发一句话、或开一个会话时。之后在你别的会话里不再重复。',
               )}
             </P>
             <List
               items={[
                 t(
-                  'End of turn: when Codex, Claude Code, Cursor, OpenCode or oh-my-pi finishes a turn, what you have not seen yet is previewed once in that session. You may be looking elsewhere, so it still shows where you next type.',
-                  '回合结束：Codex、Claude Code、Cursor、OpenCode 或 oh-my-pi 回合结束时，你还没看过的消息在这个会话里预告一次。你可能在看别的窗口，所以它仍会在你下一次打字的地方出现。',
+                  'End of turn: when Codex, Claude Code, Cursor, OpenCode, oh-my-pi or WorkBuddy finishes a turn, what you have not seen yet is previewed once in that session. You may be looking elsewhere, so it still shows where you next type.',
+                  '回合结束：Codex、Claude Code、Cursor、OpenCode、oh-my-pi 或 WorkBuddy 回合结束时，你还没看过的消息在这个会话里预告一次。你可能在看别的窗口，所以它仍会在你下一次打字的地方出现。',
                 ),
                 t(
                   'Claude Code status line: the bar at the bottom of every session names what you have not seen yet, and clears once you have.',
@@ -366,8 +366,8 @@ export function HelpPage() {
           <Section {...sectionProps('cli', 9)}>
             <P>
               {t(
-                'These commands are for you; your agent uses MCP tools instead. Most take --profile: setup names profiles after the tool (codex, cc for Claude Code, cursor, opencode, omp); agentdrop endpoint list shows yours.',
-                '这些命令是给你用的，Agent 用的是 MCP 工具。多数命令要带 --profile：setup 按工具命名（codex，Claude Code 是 cc，cursor，opencode，omp）；agentdrop endpoint list 可以查看。',
+                'These commands are for you; your agent uses MCP tools instead. Most take --profile: setup names profiles after the tool (codex, cc for Claude Code, cursor, opencode, omp, workbuddy); agentdrop endpoint list shows yours.',
+                '这些命令是给你用的，Agent 用的是 MCP 工具。多数命令要带 --profile：setup 按工具命名（codex，Claude Code 是 cc，cursor，opencode，omp，workbuddy）；agentdrop endpoint list 可以查看。',
               )}
             </P>
             <dl className="divide-y divide-line rounded-lg border border-line">

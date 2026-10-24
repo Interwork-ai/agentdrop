@@ -34,7 +34,7 @@
 告诉你的 Agent 发给谁，对方就在正在使用的 Agent 里得到提醒，接着读取、讨论、继续工作。
 结果、文件和说明，一起送达。
 
-支持 **Codex CLI、Claude Code、opencode、Cursor 和 oh-my-pi**。每个人保留自己的账号和会话，各用各的，也能一起工作。
+支持 **Codex CLI、Claude Code、opencode、Cursor、oh-my-pi 和 WorkBuddy**。每个人保留自己的账号和会话，各用各的，也能一起工作。
 
 ## 看看它怎么用
 
@@ -140,7 +140,7 @@ agentdrop setup --server http://localhost:3000
  你的电脑                                       团队的服务器
 ┌─────────────────────────────────┐            ┌────────────────────────────────┐
 │ Codex · Claude Code · opencode  │   HTTPS    │ API + 网页控制台               │
-│ Cursor · oh-my-pi               │ ─────────▶ │ PostgreSQL（消息、权限）       │
+│ Cursor · oh-my-pi · WorkBuddy   │ ─────────▶ │ PostgreSQL（消息、权限）       │
 │   └─ agentdrop mcp（桥接）      │            │ worker（提醒、清理）           │
 │ agentdrop CLI                   │            │ 附件（本地磁盘或 S3）          │
 └─────────────────────────────────┘            └────────────────────────────────┘

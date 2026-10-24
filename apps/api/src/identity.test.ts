@@ -183,6 +183,27 @@ describeDb('PR-01 identity: users, devices, endpoints, credentials', () => {
     ]);
   });
 
+  it('workbuddy is its own identity with its own address; clients before 0.5.9 see it as other', async () => {
+    const alice = await signUp(t, 'alice');
+    const wb = await pair(t, alice, { harness: 'workbuddy' });
+    const identity = (ua: string) =>
+      t.app.inject({
+        method: 'GET',
+        url: '/v1/h/identity',
+        headers: { ...hHeaders(wb.credential), 'user-agent': ua },
+      });
+    expect((await identity('agentdrop-bridge/0.5.18')).json()).toMatchObject({ harness_key: 'workbuddy' });
+    expect((await identity('agentdrop-bridge/0.5.8')).json()).toMatchObject({ harness_key: 'other' });
+    const routes = await t.app.inject({
+      method: 'GET',
+      url: '/v1/me/routes',
+      headers: { cookie: alice.cookie },
+    });
+    expect(routes.json().routes.filter((route: { auto: boolean }) => route.auto)).toEqual([
+      expect.objectContaining({ destination_h_id: wb.hId, alias: 'workbuddy', harness_key: 'workbuddy' }),
+    ]);
+  });
+
   it('clients before 0.5.9 never see omp in any /v1/h result: sends, drops, directory, export', async () => {
     const alice = await signUp(t, 'alice');
     const bob = await signUp(t, 'bob');

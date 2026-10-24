@@ -22,7 +22,7 @@ do not receive fixes; upgrade before reporting if you can.
 - The CLI: pairing, credentials and local configuration, hooks and harness configuration it writes, updates.
 - The MCP bridge (`agentdrop mcp`): the tools it exposes, local file upload and download rules.
 
-Out of scope: vulnerabilities in the coding agents themselves (Codex, Claude Code, opencode, Cursor, oh-my-pi), in
+Out of scope: vulnerabilities in the coding agents themselves (Codex, Claude Code, opencode, Cursor, oh-my-pi, WorkBuddy), in
 third-party services, or in a particular deployment's own infrastructure; reports that need an already compromised
 host or a stolen keyring.
 

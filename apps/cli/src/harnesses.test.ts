@@ -9,6 +9,7 @@ const absent = (dir: string) => ({
   cursor: join(dir, 'absent-cursor'),
   opencode: join(dir, 'absent-opencode'),
   omp: join(dir, 'absent-omp'),
+  workbuddy: join(dir, 'absent-workbuddy'),
 });
 
 describe('harness discovery and selection', () => {
@@ -17,6 +18,7 @@ describe('harness discovery and selection', () => {
       expect(() => parseHarnessList(input)).toThrow();
     expect(parseHarnessList('cursor, opencode,codex,cursor')).toEqual(['cursor', 'opencode', 'codex']);
     expect(parseHarnessList('omp')).toEqual(['omp']);
+    expect(parseHarnessList('workbuddy')).toEqual(['workbuddy']);
   });
   it('detects a GUI-only Cursor installation through its user config root', () => {
     const dir = mkdtempSync(join(tmpdir(), 'cursor-discovery-'));
@@ -46,6 +48,15 @@ describe('harness discovery and selection', () => {
       expect(detectHarnesses(() => null, { ...absent(dir), omp: dir })).toEqual(['omp']);
       expect(detectHarnesses((bin) => (bin === 'omp' ? '/bin/omp' : null), absent(dir))).toEqual(['omp']);
       expect(detectHarnesses(() => null, absent(dir))).toEqual([]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+  it('detects WorkBuddy, a desktop app with nothing on PATH, through its home directory only', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'workbuddy-discovery-'));
+    try {
+      expect(detectHarnesses(() => null, { ...absent(dir), workbuddy: dir })).toEqual(['workbuddy']);
+      expect(detectHarnesses((bin) => `/bin/${bin}`, absent(dir))).not.toContain('workbuddy');
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

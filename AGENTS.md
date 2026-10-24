@@ -96,7 +96,7 @@ packages/client     typed HTTPS client used by bridge and CLI
 ## Harness parity
 
 Every client-facing capability (MCP registration, hooks, skills, headless flags, examples) must exist for every
-supported harness: Codex CLI, Claude Code, opencode, Cursor and oh-my-pi (omp) where applicable. Configs differ; behaviour must not.
+supported harness: Codex CLI, Claude Code, opencode, Cursor, oh-my-pi (omp) and WorkBuddy where applicable. Configs differ; behaviour must not.
 Each harness is one adapter in `apps/cli/src/harnesses/<key>.ts`, listed in the registry
 (`apps/cli/src/harnesses/index.ts`); installing and removing a harness (MCP entry, hooks, plugin, extension) goes
 through its adapter only (ADR 0024). Track parity in `docs/HARNESSES.md`

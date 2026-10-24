@@ -23,4 +23,4 @@ export function repoLink(path: string): string {
 }
 
 /** The clients `agentdrop setup` connects, in the order the product names them. */
-export const CLIENTS = ['Codex CLI', 'Claude Code', 'opencode', 'Cursor', 'oh-my-pi'] as const;
+export const CLIENTS = ['Codex CLI', 'Claude Code', 'opencode', 'Cursor', 'oh-my-pi', 'WorkBuddy'] as const;

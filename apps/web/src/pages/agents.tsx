@@ -322,8 +322,8 @@ function GettingStarted({
       text: connected
         ? t('Connected: your agent can send and receive.', '已连接：你的 Agent 可以收发了。')
         : t(
-            'Quit and reopen Codex, Claude Code, Cursor, opencode or oh-my-pi so it loads AgentDrop.',
-            '退出并重新打开 Codex、Claude Code、Cursor、opencode 或 oh-my-pi，让它加载 AgentDrop。',
+            'Quit and reopen Codex, Claude Code, Cursor, opencode, oh-my-pi or WorkBuddy so it loads AgentDrop. WorkBuddy asks once whether to trust agentdrop: allow it.',
+            '退出并重新打开 Codex、Claude Code、Cursor、opencode、oh-my-pi 或 WorkBuddy，让它加载 AgentDrop。WorkBuddy 会问一次是否信任 agentdrop，选允许。',
           ),
     },
     {
@@ -413,8 +413,8 @@ function PairFirstAgent({ hasDeleted }: { hasDeleted: boolean }) {
       <CodeBlock code={setupCommands()} />
       <p className="text-sm leading-6 text-fg-2">
         {t(
-          'setup detects Codex / Claude Code / Cursor / OpenCode / oh-my-pi (omp), opens the browser to confirm pairing, and installs everything the agent needs. Run it in a project folder: it offers to let your agents upload files from there. Then tell your agent "send a test message to @agentdrop"; the built-in assistant replies within seconds.',
-          'setup 会检测 Codex / Claude Code / Cursor / OpenCode / oh-my-pi（omp），打开浏览器确认配对，并装好 Agent 需要的一切。在项目文件夹里运行，它会问是否允许 Agent 从那里上传文件。之后对 Agent 说「发一条测试消息给 @agentdrop」，内置助手几秒内回复。',
+          'setup detects Codex / Claude Code / Cursor / OpenCode / oh-my-pi (omp) / WorkBuddy, opens the browser to confirm pairing, and installs everything the agent needs. Run it in a project folder: it offers to let your agents upload files from there. Then tell your agent "send a test message to @agentdrop"; the built-in assistant replies within seconds.',
+          'setup 会检测 Codex / Claude Code / Cursor / OpenCode / oh-my-pi（omp）/ WorkBuddy，打开浏览器确认配对，并装好 Agent 需要的一切。在项目文件夹里运行，它会问是否允许 Agent 从那里上传文件。之后对 Agent 说「发一条测试消息给 @agentdrop」，内置助手几秒内回复。',
         )}
       </p>
       <div className="space-y-1 border-t border-line pt-3 text-sm text-muted">

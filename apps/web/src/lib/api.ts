@@ -440,6 +440,7 @@ export function harnessLabel(k: string): string {
         opencode: 'opencode',
         cursor: 'Cursor',
         omp: 'oh-my-pi',
+        workbuddy: 'WorkBuddy',
       } as Record<string, string>
     )[k] ?? k
   );

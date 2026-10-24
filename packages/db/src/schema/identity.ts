@@ -126,6 +126,7 @@ export const harnessKeyEnum = pgEnum('harness_key', [
   'opencode',
   'cursor',
   'omp',
+  'workbuddy',
 ]);
 
 /** H: the mailbox unit. Unique per (user, device, harness, profile). `label` is the editable agent name. */

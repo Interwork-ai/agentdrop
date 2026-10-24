@@ -19,6 +19,13 @@ Releases up to 0.4.12 predate this file.
 
 ### Added
 
+- WorkBuddy (Tencent's desktop agent, macOS) is a sixth client: `agentdrop setup` detects `~/.workbuddy` (China
+  edition) or `~/.workbuddy-ai` (international), and `agentdrop connect workbuddy` registers the MCP bridge in its
+  `mcp.json`, installs the skill and writes the same session-start, prompt and end-of-turn hooks as Claude Code into
+  its `settings.json`. WorkBuddy asks once whether to trust the server. Pairing needs a server that knows the
+  `workbuddy` key (migration `0032_workbuddy_harness`); the dashboard names WorkBuddy agents and lists WorkBuddy in
+  its setup texts. Decision: ADR 0037. `scripts/probe-host-hooks.mjs` checks whether a host runs such hooks.
+
 - A 15-second social demo with a human-relay opening, cross-person handoff, real inbox component, readable
   captions and original audio; standalone MP4/GIF and reproducible sources supplement the longer README demo.
 

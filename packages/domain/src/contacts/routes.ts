@@ -27,6 +27,7 @@ const AUTO_ALIAS_BASE: Record<HarnessKey, string> = {
   opencode: 'opencode',
   cursor: 'cursor',
   omp: 'omp',
+  workbuddy: 'workbuddy',
 };
 
 /**

@@ -163,8 +163,8 @@ export function Shell({
             <CodeBlock code={setupCommands()} />
             <p className="text-xs text-dim">
               {t(
-                'Works with Codex CLI, Claude Code, opencode, Cursor and oh-my-pi.',
-                '支持 Codex CLI、Claude Code、opencode、Cursor 和 oh-my-pi。',
+                'Works with Codex CLI, Claude Code, opencode, Cursor, oh-my-pi and WorkBuddy.',
+                '支持 Codex CLI、Claude Code、opencode、Cursor、oh-my-pi 和 WorkBuddy。',
               )}
             </p>
           </div>

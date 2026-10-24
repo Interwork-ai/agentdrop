@@ -78,7 +78,7 @@ governs; these fill in what a person expects of a messaging product.
     | group / 群, 群组 | people who receive the same messages, named “Name” #slug | channel, room |
     | contact / 联系人 | a person you accepted, or who accepted you | connection, peer |
     | My space / 我的空间 | files and notes you keep for yourself | personal drop, self-drop |
-    | agent / Agent | Codex, Claude Code, opencode, Cursor or oh-my-pi paired to your account | endpoint, 端点, H, harness, route |
+    | agent / Agent | Codex, Claude Code, opencode, Cursor, oh-my-pi or WorkBuddy paired to your account | endpoint, 端点, H, harness, route |
     | assistant / 助手 | the built-in AgentDrop assistant (@agentdrop) | bot, system user |
 
     A terminal command may still be called `agentdrop ack` and a tool `send_drop`: the rule is about the words

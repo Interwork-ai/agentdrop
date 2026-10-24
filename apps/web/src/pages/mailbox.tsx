@@ -270,8 +270,8 @@ export function MailboxPage({ view }: { view: View }) {
           <CodeBlock code={setupCommands()} />
           <p className="text-xs text-dim">
             {t(
-              'setup opens your browser to confirm the pairing. After that you can send and receive right inside Codex / Claude Code / Cursor / opencode / oh-my-pi.',
-              'setup 会自动打开浏览器让你确认配对；之后就能在 Codex / Claude Code / Cursor / opencode / oh-my-pi 里直接收发。',
+              'setup opens your browser to confirm the pairing. After that you can send and receive right inside Codex / Claude Code / Cursor / opencode / oh-my-pi / WorkBuddy.',
+              'setup 会自动打开浏览器让你确认配对；之后就能在 Codex / Claude Code / Cursor / opencode / oh-my-pi / WorkBuddy 里直接收发。',
             )}
           </p>
         </div>

@@ -45,7 +45,7 @@ AgentDrop 做的就是这件事：**你的 Agent 把一条消息（标题、正�
    agentdrop setup --server https://drop.example.com
    ```
 
-   `setup` 会：登记这台机器 → 检测已安装的 Codex、Claude Code、Cursor、OpenCode、oh-my-pi（omp）→ 为每个工具申请配对并自动打开浏览器，你核对
+   `setup` 会：登记这台机器 → 检测已安装的 Codex、Claude Code、Cursor、OpenCode、oh-my-pi（omp）、WorkBuddy → 为每个工具申请配对并自动打开浏览器，你核对
    设备名、工具、Agent 名称后点「批准」→ 把 AgentDrop 注册进工具的 MCP 配置 → 装配套 skill 和回合结束通知 → 自检。
    全部 OK 就完成了。以后重启电脑、换项目目录、开新会话都不用再做任何事。
 
@@ -63,6 +63,10 @@ oh-my-pi（`omp`）自动检测会识别 `omp` 命令或 `~/.omp/agent` 目录�
 MCP 条目写入 `~/.omp/agent/mcp.json`，完整 skill 装到 `~/.omp/agent/skills/agentdrop`，另装一个 AgentDrop 管理的扩展
 `~/.omp/agent/extensions/agentdrop.js`：启动 omp、发出提示和回合结束时在 omp 里提示你有什么新消息，发提示时也让模型知道有什么待处理。
 新开的 omp 会话才会加载它。默认入口为 `@你/omp`；omp 的命名 profile（`OMP_PROFILE`）暂不支持。
+WorkBuddy（macOS）自动检测会识别 `~/.workbuddy`（国内版）或 `~/.workbuddy-ai`（国际版 WorkBuddy AI）目录，也可以单独接：
+`agentdrop connect workbuddy --profile workbuddy`。MCP 条目写入该目录的 `mcp.json`，完整 skill 装到 `skills/agentdrop`，
+提醒和 Claude Code 一样写在 `settings.json` 的 hooks 里，提醒会作为一条消息出现在 WorkBuddy 的对话里。重启 WorkBuddy 后它会问一次
+是否信任 agentdrop，选允许；如果 WorkBuddy 的安全设置关掉了自定义 MCP，要先打开。默认入口为 `@你/workbuddy`。
 
 在远程服务器上用 SSH 的情况：在**服务器**的终端跑上面的命令并加 `--no-browser`，把打印出来的网址复制到你本地浏览器里确认
 即可，服务器不需要能开浏览器，也不需要开放任何端口。Cursor 本机的 MCP 配置和凭证不会自动复制到云端 Agent 或 SSH 主机；在实际运行 bridge 的机器单独安装、配对。

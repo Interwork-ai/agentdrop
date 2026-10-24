@@ -13,6 +13,8 @@ process.env.AGENTDROP_DATA_DIR = join(root, 'data');
 process.env.AGENTDROP_STATE_DIR = join(root, 'state');
 // oh-my-pi keeps everything (MCP servers, extensions, skills) in one agent directory; never the real one.
 process.env.PI_CODING_AGENT_DIR = join(root, 'omp-agent');
+// WorkBuddy's home (MCP servers, hooks, skills); never the real ~/.workbuddy.
+process.env.WORKBUDDY_CONFIG_DIR = join(root, 'workbuddy');
 
 /*
  * Nor may a test find its way to the server through the developer's proxy: the CLI discovers proxies from its own

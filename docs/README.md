@@ -10,7 +10,7 @@
 | understand the code before changing it | [ARCHITECTURE.md](ARCHITECTURE.md), then `AGENTS.md` at the repo root |
 | know what is implemented, tested, untested, unsupported | [STATUS.md](STATUS.md) |
 | see the real-client interop evidence | [INTEROP.md](INTEROP.md) |
-| check that Codex / Claude Code / opencode / Cursor / oh-my-pi get the same capabilities | [HARNESSES.md](HARNESSES.md) |
+| check that Codex / Claude Code / opencode / Cursor / oh-my-pi / WorkBuddy get the same capabilities | [HARNESSES.md](HARNESSES.md) |
 | publish a new CLI version | [RELEASE.md](RELEASE.md) |
 | know why things are the way they are | [adr/](adr/README.md) (decision records; they win over anything older) |
 | change the dashboard's look | [DESIGN.md](DESIGN.md) |

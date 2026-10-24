@@ -32,7 +32,7 @@ body:
     attributes:
       label: Agent client
       multiple: true
-      options: [Codex CLI, Claude Code, opencode, Cursor, oh-my-pi, Dashboard only, Not client-related]
+      options: [Codex CLI, Claude Code, opencode, Cursor, oh-my-pi, WorkBuddy, Dashboard only, Not client-related]
   - type: textarea
     id: logs
     attributes:

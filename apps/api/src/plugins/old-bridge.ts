@@ -39,13 +39,14 @@ export function clientBeforeGroupHistory(req: FastifyRequest): boolean {
 }
 
 /**
- * Harness keys added in 0.5.9. Older clients parse `harness_key` against an enum without them, so the bridge would
- * reject the whole result and the CLI an export record; they are told `other`, the key for an agent of no named kind.
- * From 0.5.9 the bridge reads any key it does not know as `other` itself, so a later harness needs no entry here.
+ * Harness keys a client before 0.5.9 does not know. Those clients parse `harness_key` against an enum without them,
+ * so the bridge would reject the whole result and the CLI an export record; they are told `other`, the key for an
+ * agent of no named kind. From 0.5.9 the bridge reads any key it does not know as `other` itself, so only these old
+ * clients need every later key listed here.
  */
-const NEWER_HARNESS_KEYS = new Set(['omp']);
+const NEWER_HARNESS_KEYS = new Set(['omp', 'workbuddy']);
 
-/** Replaces a 0.5.9 harness key in every `harness_key` field (outside drop extensions) by `other`. */
+/** Replaces a harness key newer than 0.5.8 in every `harness_key` field (outside drop extensions) by `other`. */
 export function withoutNewerHarnessKeys(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(withoutNewerHarnessKeys);
   if (!value || typeof value !== 'object') return value;

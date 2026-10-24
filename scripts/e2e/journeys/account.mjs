@@ -17,10 +17,12 @@ export async function run(ctx) {
   const root = await signUp('ac_root');
   const bea = await signUp('ac_bea');
   const pi = await signUp('ac_pi', ['omp']);
+  const wb = await signUp('ac_wb', ['workbuddy']);
   makeAdmin('ac_root');
 
   await agents(ctx, ann);
   await ompAgent(ctx, pi);
+  await workbuddyAgent(ctx, wb);
   await settings(ctx, ann);
   await admin(ctx, root, bea);
   await authPages(ctx, ann);
@@ -56,6 +58,19 @@ async function ompAgent(ctx, pi) {
     const row = page.getByRole('listitem').filter({ has: page.getByText('ac_pi omp', { exact: true }) });
     await row.first().waitFor();
     await row.first().getByText('oh-my-pi', { exact: true }).first().waitFor();
+  });
+}
+
+/** A WorkBuddy agent, the newest harness, is named by its tool the same way. */
+async function workbuddyAgent(ctx, wb) {
+  const { page, step, nav } = await ctx.session('workbuddy agents', wb);
+  await step('my agents names a WorkBuddy agent by its tool', async () => {
+    await nav('My agents');
+    const row = page
+      .getByRole('listitem')
+      .filter({ has: page.getByText('ac_wb workbuddy', { exact: true }) });
+    await row.first().waitFor();
+    await row.first().getByText('WorkBuddy', { exact: true }).first().waitFor();
   });
 }
 

@@ -400,7 +400,8 @@
                       "other",
                       "opencode",
                       "cursor",
-                      "omp"
+                      "omp",
+                      "workbuddy"
                     ]
                   },
                   "profile_key": {
@@ -2668,7 +2669,8 @@
                                           "other",
                                           "opencode",
                                           "cursor",
-                                          "omp"
+                                          "omp",
+                                          "workbuddy"
                                         ]
                                       },
                                       "address": {
@@ -2730,7 +2732,8 @@
                                         "other",
                                         "opencode",
                                         "cursor",
-                                        "omp"
+                                        "omp",
+                                        "workbuddy"
                                       ]
                                     },
                                     "auto": {
@@ -3437,7 +3440,8 @@
                                       "other",
                                       "opencode",
                                       "cursor",
-                                      "omp"
+                                      "omp",
+                                      "workbuddy"
                                     ]
                                   }
                                 },
@@ -3474,7 +3478,8 @@
                                     "other",
                                     "opencode",
                                     "cursor",
-                                    "omp"
+                                    "omp",
+                                    "workbuddy"
                                   ]
                                 },
                                 "received_at": {
@@ -3580,7 +3585,8 @@
                                         "other",
                                         "opencode",
                                         "cursor",
-                                        "omp"
+                                        "omp",
+                                        "workbuddy"
                                       ]
                                     },
                                     {
@@ -4073,7 +4079,8 @@
                                   "other",
                                   "opencode",
                                   "cursor",
-                                  "omp"
+                                  "omp",
+                                  "workbuddy"
                                 ]
                               },
                               {
@@ -4693,7 +4700,8 @@
                                     "other",
                                     "opencode",
                                     "cursor",
-                                    "omp"
+                                    "omp",
+                                    "workbuddy"
                                   ]
                                 }
                               },
@@ -4730,7 +4738,8 @@
                                   "other",
                                   "opencode",
                                   "cursor",
-                                  "omp"
+                                  "omp",
+                                  "workbuddy"
                                 ]
                               },
                               "received_at": {
@@ -4836,7 +4845,8 @@
                                       "other",
                                       "opencode",
                                       "cursor",
-                                      "omp"
+                                      "omp",
+                                      "workbuddy"
                                     ]
                                   },
                                   {

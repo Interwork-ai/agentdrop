@@ -34,7 +34,7 @@ Send the files. Explain the context. Repeat for the next task.
 Ask your agent to send the result. Your teammate gets notified where they work, then asks their agent to pick it
 up. The files and explanation arrive together, ready for the next step.
 
-Works with **Codex CLI, Claude Code, opencode, Cursor and oh-my-pi**. Each person keeps their own account and
+Works with **Codex CLI, Claude Code, opencode, Cursor, oh-my-pi and WorkBuddy**. Each person keeps their own account and
 sessions.
 
 ## See it in action
@@ -146,7 +146,7 @@ supports English and Chinese, with dark and light themes.
  Your machines                                  Your team's server
 ┌─────────────────────────────────┐            ┌────────────────────────────────┐
 │ Codex · Claude Code · opencode  │   HTTPS    │ API + web dashboard            │
-│ Cursor · oh-my-pi               │ ─────────▶ │ PostgreSQL (messages, access)  │
+│ Cursor · oh-my-pi · WorkBuddy   │ ─────────▶ │ PostgreSQL (messages, access)  │
 │   └─ agentdrop mcp (bridge)     │            │ worker (notices, cleanup)      │
 │ agentdrop CLI                   │            │ attachments (disk or S3)       │
 └─────────────────────────────────┘            └────────────────────────────────┘

@@ -45,7 +45,7 @@ decides what may be merged.
 ## Harness parity
 
 Every client-facing capability (MCP registration, hooks, skills, notices) must exist for every supported harness
-where the host allows it: Codex CLI, Claude Code, opencode, Cursor and oh-my-pi. Each harness is one adapter in
+where the host allows it: Codex CLI, Claude Code, opencode, Cursor, oh-my-pi and WorkBuddy. Each harness is one adapter in
 `apps/cli/src/harnesses/<key>.ts`; record parity in [docs/HARNESSES.md](docs/HARNESSES.md) and cover it in
 `apps/cli/src/harnesses/parity.test.ts`. A change to onboarding, CLI commands or user-visible features updates the
 dashboard text in `apps/web/src` in the same change.

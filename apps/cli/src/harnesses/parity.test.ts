@@ -143,6 +143,7 @@ const EXPECTED: Record<Harness, { endOfTurn: string; promptContext: boolean; ses
   cursor: { endOfTurn: 'cursor', promptContext: false, sessionStart: false },
   opencode: { endOfTurn: 'opencode', promptContext: false, sessionStart: false },
   omp: { endOfTurn: 'system-message', promptContext: true, sessionStart: true },
+  workbuddy: { endOfTurn: 'system-message', promptContext: true, sessionStart: true },
 };
 
 const PENDING =
@@ -214,6 +215,10 @@ const READ: Record<Harness, (home: string) => Installed> = {
     mcp: argv(entry(readJson(join(home, 'omp-agent', 'mcp.json')).mcpServers)),
     notices: generatedSource(join(home, 'omp-agent', 'extensions', 'agentdrop.js')),
   }),
+  workbuddy: (home) => ({
+    mcp: argv(entry(readJson(join(home, 'workbuddy', 'mcp.json')).mcpServers)),
+    notices: commandHooks(join(home, 'workbuddy', 'settings.json')),
+  }),
 };
 
 describe('harness parity across the registry', () => {
@@ -229,6 +234,7 @@ describe('harness parity across the registry', () => {
     vi.stubEnv('CLAUDE_CONFIG_DIR', join(home, 'claude'));
     vi.stubEnv('XDG_CONFIG_HOME', join(home, 'xdg'));
     vi.stubEnv('PI_CODING_AGENT_DIR', join(home, 'omp-agent'));
+    vi.stubEnv('WORKBUDDY_CONFIG_DIR', join(home, 'workbuddy'));
   });
   afterEach(() => {
     vi.unstubAllEnvs();

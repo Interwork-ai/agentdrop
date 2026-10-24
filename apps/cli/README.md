@@ -103,6 +103,11 @@ oh-my-pi (`omp`) pairs as its own key with the default route `@user/omp`. `conne
 into `~/.omp/agent/mcp.json` and one managed extension, `~/.omp/agent/extensions/agentdrop.js`, which runs the same
 `pending --in-hook` commands at session start, prompt and turn end (`PI_CODING_AGENT_DIR` relocates both).
 
+WorkBuddy (`workbuddy`, macOS) pairs as its own key with the default route `@user/workbuddy`. `connect workbuddy`
+writes `mcpServers.agentdrop` into `~/.workbuddy/mcp.json` (`~/.workbuddy-ai` for the international edition,
+`WORKBUDDY_CONFIG_DIR` overrides), the skill into its `skills/`, and Claude Code's three hooks into its
+`settings.json`. WorkBuddy asks once whether to trust the new server; allow it.
+
 ## Quiet Stop hooks and updates (0.4.3+)
 
 ```bash

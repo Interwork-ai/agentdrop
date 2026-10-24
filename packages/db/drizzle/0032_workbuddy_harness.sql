@@ -1,0 +1,1 @@
+ALTER TYPE "public"."harness_key" ADD VALUE 'workbuddy';
