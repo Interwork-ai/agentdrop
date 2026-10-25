@@ -4,3 +4,7 @@ packages:
 onlyBuiltDependencies:
   - esbuild
   - '@biomejs/biome'
+# Security fixes for transitive dependencies whose parents pin an older range. drizzle-kit loads its config
+# through @esbuild-kit, which pins esbuild ~0.18 (GHSA-67mh-4wv8-2f99 concerns esbuild's dev server, not used here).
+overrides:
+  '@esbuild-kit/core-utils>esbuild': 0.25.12

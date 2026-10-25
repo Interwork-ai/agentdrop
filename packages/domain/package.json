@@ -18,6 +18,6 @@
     "@agentdrop/contracts": "workspace:*",
     "@agentdrop/db": "workspace:*",
     "drizzle-orm": "0.45.3",
-    "zod": "4.6.5"
+    "zod": "4.6.7"
   }
 }

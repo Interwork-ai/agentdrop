@@ -63,6 +63,13 @@ Releases up to 0.4.12 predate this file.
 - The server release workflow failed after pushing the image when the repository owner has capital letters
   (`Interwork-ai`): image references are now lowercased before the runtime tarball is exported.
 
+### Security
+
+- Dependencies with published advisories are updated: zod 4.6.7, fastify 5.12.7 (and fast-uri through it),
+  nodemailer 10.2.1, undici 8.12.3 in the CLI, and source-map-js in the dashboard build; drizzle-kit's
+  @esbuild-kit loader now gets esbuild 0.25.12 through a pnpm override. `pnpm audit` reports nothing.
+
+
 ## [0.5.17] - 2026-10-14
 
 ### Added
