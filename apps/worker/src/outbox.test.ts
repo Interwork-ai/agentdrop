@@ -11,6 +11,7 @@ import {
   processOne,
   recordProgress,
   renewEvent,
+  sweepFinishedEvents,
 } from './outbox.js';
 
 function required<T>(value: T | null | undefined): T {
@@ -212,6 +213,28 @@ describeDb('outbox production leasing and fencing', () => {
     const [event] = await db.drizzle.select().from(outboxEvents);
     expect(required(event).lastError).toBe('HANDLER_FAILED');
     expect(required(event).lockedUntil).toBeNull();
+  });
+
+  it('sweeps delivered and dead-lettered events past the window, never one still waiting', async () => {
+    for (let i = 0; i < 4; i++) await seed();
+    const ids = (await db.drizzle.select({ id: outboxEvents.id }).from(outboxEvents)).map((r) => r.id);
+    const [oldDelivered, oldDead, recentDelivered, pending] = ids as [string, string, string, string];
+    const longAgo = new Date(Date.now() - 40 * 86_400_000);
+    await db.drizzle
+      .update(outboxEvents)
+      .set({ deliveredAt: longAgo })
+      .where(eq(outboxEvents.id, oldDelivered));
+    await db.drizzle.update(outboxEvents).set({ deadAt: longAgo }).where(eq(outboxEvents.id, oldDead));
+    await db.drizzle
+      .update(outboxEvents)
+      .set({ deliveredAt: new Date() })
+      .where(eq(outboxEvents.id, recentDelivered));
+    await db.drizzle.update(outboxEvents).set({ createdAt: longAgo }).where(eq(outboxEvents.id, pending));
+    expect(await sweepFinishedEvents(db, new Date(Date.now() - 30 * 86_400_000))).toBe(2);
+    const left = (await db.drizzle.select({ id: outboxEvents.id }).from(outboxEvents))
+      .map((r) => r.id)
+      .sort();
+    expect(left).toEqual([recentDelivered, pending].sort());
   });
 
   it('process renews a long handler lease and completes using the stable event id', async () => {

@@ -34,9 +34,9 @@ import type { MailboxScope } from '../principals.js';
 import { assertReadyAttachments } from './attachments.js';
 import { loadAuthorizedDrop } from './authorization.js';
 import { enqueueOutbox } from './outbox.js';
-import { markReadForPerson } from './read.js';
 import { privateRecipients } from './recipient-privacy.js';
 import { bumpMailboxes } from './revision.js';
+import { markReadForPerson } from './state.js';
 
 /** Drops to and from the built-in assistant are test traffic: they expire after 30 days. */
 export const SYSTEM_DROP_TTL_MS = 30 * 24 * 3600 * 1000;

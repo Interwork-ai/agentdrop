@@ -14,6 +14,7 @@ import {
   requestBackfill,
   sendUpdateReminders,
   sweepMailboxEvents,
+  sweepRateLimits,
 } from '@agentdrop/domain';
 import { FsStorage, S3Storage, type StorageProvider } from '@agentdrop/storage';
 import { and, isNull, sql } from 'drizzle-orm';
@@ -22,7 +23,7 @@ import { z } from 'zod';
 import { startFeishuEvents } from './feishu-events.js';
 import { syncFeishuCards } from './feishu-sync.js';
 import { createHandlers } from './handlers.js';
-import { processOne } from './outbox.js';
+import { processOne, sweepFinishedEvents } from './outbox.js';
 import { configureWebPush, loadWebPushConfig } from './push.js';
 import type { WebhookOptions } from './webhook.js';
 
@@ -54,7 +55,10 @@ const config = z
       .optional()
       .transform((v) => v !== undefined && /^(1|true|yes)$/i.test(v)),
     STAGING_TTL_HOURS: z.coerce.number().int().positive().default(24),
-    /** Days mailbox events stay readable on the event stream (ADR 0040); older cursors get RESYNC_REQUIRED. */
+    /**
+     * Days mailbox events stay readable on the event stream (ADR 0040; older cursors get RESYNC_REQUIRED), and
+     * delivered or dead-lettered outbox events stay for diagnosis.
+     */
     MAILBOX_EVENTS_RETENTION_DAYS: z.coerce.number().int().positive().default(30),
     /** Where people open the dashboard; used for the link in Feishu notices. Optional: no link without it. */
     PUBLIC_BASE_URL: z.preprocess((v) => (v === '' ? undefined : v), z.string().url().optional()),
@@ -143,6 +147,16 @@ async function maintenance(): Promise<void> {
     if (n < EVENT_SWEEP_BATCH) break;
   }
   if (swept) log.info({ count: swept }, 'swept old mailbox events');
+  // Delivered and dead-lettered side effects are kept as long, for diagnosis; pending ones are never swept.
+  let finished = 0;
+  for (let pass = 0; pass < 20; pass++) {
+    const n = await sweepFinishedEvents(db, eventsBefore, EVENT_SWEEP_BATCH);
+    finished += n;
+    if (n < EVENT_SWEEP_BATCH) break;
+  }
+  if (finished) log.info({ count: finished }, 'swept finished outbox events');
+  // rate-limit windows that ended over an hour ago; a later request would reuse the row anyway
+  await withTx(db, (tx) => sweepRateLimits(tx, new Date(Date.now() - 3_600_000)));
   if (
     cliLatest &&
     config.UPDATE_REMINDER_DAYS.length > 0 &&

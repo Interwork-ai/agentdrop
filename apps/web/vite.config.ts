@@ -50,5 +50,11 @@ export default defineConfig({
     // Fonts ship as files: the CSP allows fonts from this origin only, so a small font inlined as a data: URL would
     // be blocked in production. Other small assets keep Vite's default inlining.
     assetsInlineLimit: (file) => (/\.(woff2?|ttf|otf)$/.test(file) ? false : undefined),
+    rolldownOptions: {
+      output: {
+        // Libraries change far less often than the dashboard: their own file stays cached across releases.
+        advancedChunks: { groups: [{ name: 'vendor', test: /node_modules/ }] },
+      },
+    },
   },
 });

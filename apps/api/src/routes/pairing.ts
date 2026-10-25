@@ -8,8 +8,16 @@ import { parse } from '../plugins/validate.js';
 
 /** Unauthenticated CLI side of pairing. The browser side lives under /v1/me/pairing. */
 export async function pairingRoutes(app: FastifyInstance, ctx: AppContext): Promise<void> {
-  const startLimiter = createIpLimiter(app, { windowMs: 60_000, max: ctx.config.PAIRING_START_PER_MIN });
-  const pollLimiter = createIpLimiter(app, { windowMs: 60_000, max: ctx.config.PAIRING_START_PER_MIN * 12 });
+  const startLimiter = createIpLimiter(ctx, {
+    name: 'pairing-start',
+    windowMs: 60_000,
+    max: ctx.config.PAIRING_START_PER_MIN,
+  });
+  const pollLimiter = createIpLimiter(ctx, {
+    name: 'pairing-poll',
+    windowMs: 60_000,
+    max: ctx.config.PAIRING_START_PER_MIN * 12,
+  });
 
   app.post('/v1/pairing/start', { preHandler: [startLimiter] }, async (req) => {
     const input = parse(pairingStartInputSchema, req.body);

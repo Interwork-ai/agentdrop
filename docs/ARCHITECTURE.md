@@ -252,7 +252,14 @@ reachable by a human at a terminal or through the dashboard session.
   makes stale (an open search and the composer's recipient list are only marked stale); a fresh stream refetches
   everything once. The refetch interval does not depend on the stream, which only makes views quicker.
 - Worker: `outbox_events` claimed with `FOR UPDATE SKIP LOCKED` and a lease; exponential backoff; dead-letter after
-  8 attempts; handlers are idempotent. Delivery never waits for it.
+  8 attempts; handlers are idempotent. Delivery never waits for it. Delivered and dead-lettered events are swept
+  after the event retention window; a pending one never is.
+- Rate limits: one row per key and window in `rate_limits`, incremented in a single upsert, so every API process
+  enforces the same limit (Better Auth's sign-in limit stays per process). A search's concurrency cap is per process
+  on purpose: it bounds that process's CPU.
+- Reads cost a fixed number of queries per page: who each drop went to, read receipts and replies are computed for
+  the page at once (`privateRecipientsMany`, `*ForDrops`), never per drop.
+- `packages/domain/src/mailbox/read.ts` holds the reads; `state.ts` the person's read/starred/archived changes.
 
 ## 7. What to touch for common changes
 

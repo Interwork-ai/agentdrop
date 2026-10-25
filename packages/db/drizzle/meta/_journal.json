@@ -253,6 +253,13 @@
       "when": 1792907831725,
       "tag": "0035_mailbox_events_retention",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1792908893268,
+      "tag": "0036_rate_limits",
+      "breakpoints": true
     }
   ]
 }

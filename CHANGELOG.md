@@ -12,6 +12,15 @@ Releases up to 0.4.12 predate this file.
 
 ### Changed
 
+- Rate limits (pairing, password reset, recovery, export, invite previews and the per-minute search limit) are
+  counted in the database, so they hold as one limit across several API processes and survive a restart.
+
+- Lists cost a fixed number of database queries per page: who each drop went to is now worked out for the whole
+  page at once instead of once per drop.
+
+- The dashboard loads faster: the landing page and the admin console load only when opened, and libraries ship in
+  their own cached file.
+
 - The CLI update reminder's Chinese text says to restart the client, like the English text, instead of naming
   four clients.
 
@@ -19,7 +28,8 @@ Releases up to 0.4.12 predate this file.
   contact request or group change), through the event stream of the visible tab; its 10-second background refresh
   stays as it was.
 
-- Database: an index on `mailbox_events.created_at` (expand-only migration 0035). It is a plain `CREATE INDEX` on
+- Database: an index on `mailbox_events.created_at` and the `rate_limits` table (expand-only migrations 0035 and
+  0036). 0035 is a plain `CREATE INDEX` on
   `mailbox_events`, which has never been swept before: it blocks sends and state changes while it builds, so plan a
   migration window on a server with a long history.
 
@@ -74,6 +84,9 @@ Releases up to 0.4.12 predate this file.
   components and fictional data.
 
 ### Fixed
+
+- The worker now deletes delivered and dead-lettered outbox events after the retention window
+  (`MAILBOX_EVENTS_RETENTION_DAYS`); they were kept forever. Events still waiting are never deleted.
 
 - Dashboard: a group left or declined earlier opens again when it is opened again (after a new invitation, or with
   Back) instead of showing an empty page, and a leave or decline whose answer arrives after another group was

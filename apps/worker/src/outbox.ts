@@ -1,5 +1,5 @@
 import { type Database, outboxEvents, withTx } from '@agentdrop/db';
-import { and, eq, isNull, or, sql } from 'drizzle-orm';
+import { and, eq, isNotNull, isNull, lt, or, sql } from 'drizzle-orm';
 
 export type ClaimedEvent = typeof outboxEvents.$inferSelect;
 
@@ -135,6 +135,21 @@ export async function failEvent(db: Database, event: ClaimedEvent, maxAttempts: 
     .where(owned(event))
     .returning({ id: outboxEvents.id });
   return rows.length === 1;
+}
+
+/**
+ * Deletes up to `batch` events that finished before `before`: delivered, or dead-lettered after their last attempt.
+ * An event still waiting for delivery is never touched, however old. Returns how many went.
+ */
+export async function sweepFinishedEvents(db: Database, before: Date, batch = 5000): Promise<number> {
+  const finished = or(
+    and(isNotNull(outboxEvents.deliveredAt), lt(outboxEvents.deliveredAt, before)),
+    and(isNotNull(outboxEvents.deadAt), lt(outboxEvents.deadAt, before)),
+  );
+  const result = await db.drizzle.execute(sql`
+    delete from ${outboxEvents} where ${outboxEvents.id} in (
+      select ${outboxEvents.id} from ${outboxEvents} where ${finished} limit ${batch})`);
+  return result.rowCount ?? 0;
 }
 
 /**

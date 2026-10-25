@@ -7,13 +7,11 @@ import {
   type GroupLabel,
   LIMITS,
   type ListDropsInput,
-  type MarkAllReadInput,
   type ReadDropInput,
   type RecipientStatus,
   type RepliesInfo,
   type ReplyRef,
   resolvedRecipientSchema,
-  type SetDropStateInput,
 } from '@agentdrop/contracts';
 import {
   appUsers,
@@ -45,8 +43,7 @@ import {
   readableThrough,
   visibleEndpointIds,
 } from './authorization.js';
-import { privateRecipients } from './recipient-privacy.js';
-import { bumpMailboxes, type MailboxEventInput } from './revision.js';
+import { privateRecipientsMany } from './recipient-privacy.js';
 
 interface Cursor {
   t: string;
@@ -710,11 +707,21 @@ async function presentationsForDrops(
   const receipts = await receiptsForDrops(tx, scope.userId, dropRows);
   const replyRefs = await replyRefsForDrops(tx, dropRows, visibleHIds, viewer);
   const replies = await repliesForDrops(tx, scope.userId, dropRows, visibleHIds, viewer);
+  // the author's own drops list who they went to, rendered for the whole page at once
+  const authored = dropRows.filter((drop) => drop.authorUserId === scope.userId);
+  const rendered = await privateRecipientsMany(
+    tx,
+    scope.userId,
+    authored.map((drop) => ({
+      raw: (drop.targetSnapshot as { recipients?: unknown } | null)?.recipients,
+      snapshot: drop.targetSnapshot,
+      dropId: drop.id,
+    })),
+  );
+  const recipientsOf = new Map(authored.map((drop, i) => [drop.id, rendered[i] ?? []]));
 
   for (const drop of dropRows) {
     const ownOrigin = originById.get(drop.originHId);
-    const targetSnapshot = drop.targetSnapshot as { recipients?: unknown } | null;
-    const parsedRecipients = resolvedRecipientSchema.array().safeParse(targetSnapshot?.recipients);
     const validDeliveries = deliveryRows.flatMap(({ delivery, endpoint }) => {
       if (delivery.dropId !== drop.id) return [];
       const mine = grants.filter((grant) => grant.deliveryId === delivery.id);
@@ -753,10 +760,7 @@ async function presentationsForDrops(
         ? { h_id: ownOrigin.id, agent_name: ownOrigin.label, harness_key: ownOrigin.harnessKey }
         : null,
       deliveries: validDeliveries,
-      recipients:
-        drop.authorUserId === scope.userId && parsedRecipients.success
-          ? await privateRecipients(tx, scope.userId, parsedRecipients.data, drop.targetSnapshot, drop.id)
-          : [],
+      recipients: recipientsOf.get(drop.id) ?? [],
       recipientStatus: receipts.get(drop.id),
       replyTo: (drop.replyToDropId && replyRefs.get(drop.replyToDropId)) || null,
       replies: replies.get(drop.id),
@@ -904,57 +908,6 @@ async function repliesForDrops(
 }
 
 /**
- * Marks drops read for one person, as setDropState does (ADR 0007: one state per person, on every delivery of the
- * drop to any of their agents, all ending on the same new version), but without an expected version: it is applied
- * by the person's own send (ADR 0016), not a client's toggle. Drops already read everywhere are left alone, and only
- * deliveries with a valid grant change.
- * Returns the mailbox events for the caller to bump together with its own, so heads are locked once, in order.
- */
-export async function markReadForPerson(
-  tx: Tx,
-  userId: string,
-  dropIds: string[],
-): Promise<MailboxEventInput[]> {
-  if (dropIds.length === 0) return [];
-  const rows = await tx
-    .select({ d: deliveries })
-    .from(deliveries)
-    .innerJoin(harnessEndpoints, eq(harnessEndpoints.id, deliveries.hId))
-    .where(
-      and(
-        inArray(deliveries.dropId, [...new Set(dropIds)]),
-        eq(harnessEndpoints.userId, userId),
-        // as setDropState: a delivery whose grant was revoked carries no state, so a drop the person can read only
-        // as group history (ADR 0022) is never marked by answering it
-        hasValidGrant(deliveries.id),
-      ),
-    )
-    .orderBy(deliveries.id)
-    .for('update', { of: deliveries });
-  const byDrop = new Map<string, Array<typeof deliveries.$inferSelect>>();
-  for (const { d } of rows) byDrop.set(d.dropId, [...(byDrop.get(d.dropId) ?? []), d]);
-  const now = new Date();
-  const events: MailboxEventInput[] = [];
-  for (const [dropId, mine] of byDrop) {
-    if (mine.every((d) => d.readAt !== null)) continue;
-    const readAt = mine
-      .map((d) => d.readAt)
-      .reduce<Date | null>((a, b) => (b && (!a || b < a) ? b : a), null);
-    await tx
-      .update(deliveries)
-      .set({ readAt: readAt ?? now, stateVersion: Math.max(...mine.map((d) => d.stateVersion)) + 1 })
-      .where(
-        inArray(
-          deliveries.id,
-          mine.map((d) => d.id),
-        ),
-      );
-    for (const d of mine) events.push({ hId: d.hId, type: 'delivery.state', dropId, deliveryId: d.id });
-  }
-  return events;
-}
-
-/**
  * Read receipts for the drops the viewer wrote, one entry per frozen recipient. A person counts as having read a
  * drop once any of their deliveries was opened (`opened_at`) or marked read (`read_at`). Everything is aggregated
  * per person: the author learns who read it, never which agent or device of theirs did.
@@ -1002,10 +955,18 @@ async function receiptsForDrops(
   const userById = new Map(users.map((user) => [user.id, user]));
   const iso = (date: Date | null) => (date ? new Date(date).toISOString() : null);
 
-  for (const drop of authored) {
+  const rendered = await privateRecipientsMany(
+    tx,
+    viewerUserId,
+    authored.map((drop) => ({
+      raw: (drop.targetSnapshot as { recipients?: unknown } | null)?.recipients,
+      snapshot: drop.targetSnapshot,
+      dropId: drop.id,
+    })),
+  );
+  for (const [i, drop] of authored.entries()) {
     const snapshot = drop.targetSnapshot as { recipients?: unknown; group_ids?: unknown } | null;
-    const parsed = resolvedRecipientSchema.array().safeParse(snapshot?.recipients);
-    if (!parsed.success) continue;
+    if (!resolvedRecipientSchema.array().safeParse(snapshot?.recipients).success) continue;
     const groupIds = Array.isArray(snapshot?.group_ids)
       ? snapshot.group_ids.filter((id): id is string => typeof id === 'string')
       : [];
@@ -1013,13 +974,7 @@ async function receiptsForDrops(
       .filter((row) => row.dropId === drop.id)
       .map((row) => ({ ...row, user: userById.get(row.userId), groups: row.groupIds.split(',') }));
     let groupIndex = 0;
-    const visibleRecipients = await privateRecipients(
-      tx,
-      viewerUserId,
-      parsed.data,
-      drop.targetSnapshot,
-      drop.id,
-    );
+    const visibleRecipients = rendered[i] ?? [];
     const statuses: RecipientStatus[] = visibleRecipients.map((recipient) => {
       if (recipient.type === 'group') {
         // Group recipients and `group_ids` are appended together at send time, in the same order.
@@ -1067,7 +1022,7 @@ export async function unreadCount(tx: Tx, hId: string): Promise<number> {
   return unreadCountForEndpoints(tx, [hId]);
 }
 
-async function unreadCountForEndpoints(tx: Tx, hIds: string[]): Promise<number> {
+export async function unreadCountForEndpoints(tx: Tx, hIds: string[]): Promise<number> {
   const rows = await tx
     .select({ n: sql<number>`count(distinct ${deliveries.dropId})::int` })
     .from(deliveries)
@@ -1226,159 +1181,6 @@ export function toAttachmentMeta(a: typeof attachments.$inferSelect): Attachment
     sha256: meta.sha256 ?? '0'.repeat(64),
     // still listed on its drop, but no longer downloadable (FILE_REMOVED); absent for every other file
     ...(a.status === 'deleted' ? { removed: true } : {}),
-  };
-}
-
-/** Shared read/starred/archived flags of this H. Optimistic concurrency via state_version. */
-/**
- * Read, starred and archived are one state per person, not per agent (ADR 0007): all agents of an account are
- * treated as the same reader. The flags change together on every delivery of this drop to any of the account's
- * agents, from whichever agent asks — provided it may see the drop at all. `expected_version` is compared with
- * the highest version among those deliveries, and every one of them ends on the same new version.
- */
-export async function setDropState(
-  tx: Tx,
-  scope: MailboxScope,
-  input: SetDropStateInput,
-): Promise<{ drop_id: string; read: boolean; starred: boolean; archived: boolean; state_version: number }> {
-  // Visibility follows the account's mailbox preference, exactly as for reading the drop.
-  const auth = await loadAuthorizedDrop(tx, scope, input.drop_id);
-  // Reading it only as the group's history or as an admin gives no state (ADR 0022), even when another of the
-  // person's agents received it: with account-wide reads off, this agent cannot see that delivery, so it may not
-  // change it either. A delivery or the person's own send (ADR 0007: state is the person's) is what gives state.
-  if (!auth.sources.some((s) => s === 'direct' || s === 'group' || s === 'sender'))
-    throw new AgentDropError(
-      'NOT_FOUND',
-      'this drop is not in the mailbox of any of your agents (sent only, or readable only as group history)',
-    );
-  const rows = await tx
-    .select({ d: deliveries })
-    .from(deliveries)
-    .innerJoin(harnessEndpoints, eq(harnessEndpoints.id, deliveries.hId))
-    .where(
-      and(
-        eq(deliveries.dropId, input.drop_id),
-        eq(harnessEndpoints.userId, scope.userId),
-        // Only deliveries that still authorize a read carry state: one whose grant was revoked (left the group,
-        // changed the receiving agent) is gone from the mailbox, and a drop readable only as the group's history
-        // or by an admin is read-only (ADR 0022).
-        hasValidGrant(deliveries.id),
-      ),
-    )
-    .orderBy(deliveries.id)
-    .for('update', { of: deliveries });
-  const mine = rows.map((r) => r.d);
-  if (mine.length === 0)
-    throw new AgentDropError(
-      'NOT_FOUND',
-      'this drop is not in the mailbox of any of your agents (sent only, or readable only as group history)',
-    );
-  const version = Math.max(...mine.map((d) => d.stateVersion));
-  if (version !== input.expected_version) {
-    throw new AgentDropError('VERSION_CONFLICT', 'state changed by another session', {
-      current_version: version,
-    });
-  }
-  const now = new Date();
-  // Start from the union: any delivery already read/starred/archived counts, so older, diverged rows converge.
-  const earliest = (pick: (d: (typeof mine)[number]) => Date | null) =>
-    mine.map(pick).reduce<Date | null>((a, b) => (b && (!a || b < a) ? b : a), null);
-  const flag = (wanted: boolean | undefined, current: Date | null) =>
-    wanted === undefined ? current : wanted ? (current ?? now) : null;
-  const patch = {
-    stateVersion: version + 1,
-    readAt: flag(
-      input.read,
-      earliest((d) => d.readAt),
-    ),
-    starredAt: flag(
-      input.starred,
-      earliest((d) => d.starredAt),
-    ),
-    archivedAt: flag(
-      input.archived,
-      earliest((d) => d.archivedAt),
-    ),
-  };
-  await tx
-    .update(deliveries)
-    .set(patch)
-    .where(
-      inArray(
-        deliveries.id,
-        mine.map((d) => d.id),
-      ),
-    );
-  await bumpMailboxes(
-    tx,
-    mine.map((d) => ({ hId: d.hId, type: 'delivery.state' as const, dropId: d.dropId, deliveryId: d.id })),
-  );
-  return {
-    drop_id: input.drop_id,
-    read: patch.readAt !== null,
-    starred: patch.starredAt !== null,
-    archived: patch.archivedAt !== null,
-    state_version: patch.stateVersion,
-  };
-}
-
-/**
- * The person's "mark all as read" (ADR 0018): every drop that is unread and not archived in their inbox, or only
- * those that reached them through `group_id`, received no later than `up_to` (what the list showed when they
- * clicked; anything newer stays unread). Visibility is the inbox's own (account-wide or this agent, per the
- * account's mailbox preference); the change itself is the person's state on every delivery of each drop to any of
- * their agents (ADR 0007), through markReadForPerson, so versions and mailbox events match setDropState.
- */
-export async function markAllRead(
-  tx: Tx,
-  scope: MailboxScope,
-  input: MarkAllReadInput,
-): Promise<{ marked: number; remaining: number; unread_count: number }> {
-  const visibility = await visibleEndpointIds(tx, scope);
-  const now = new Date();
-  const requested = input.up_to ? new Date(input.up_to) : now;
-  const upTo = requested < now ? requested : now;
-  const groupCond = input.group_id
-    ? sql<boolean>`exists (select 1 from ${deliveryGrants} g where g.delivery_id = ${deliveries.id} and g.kind = 'group' and g.group_id = ${input.group_id} and g.revoked_at is null)`
-    : undefined;
-  const unreadInView = and(
-    inArray(deliveries.hId, visibility.hIds),
-    isNull(deliveries.readAt),
-    isNull(deliveries.archivedAt),
-    isNull(drops.revokedAt),
-    hasValidGrant(deliveries.id),
-    notExpired(),
-    notSelfDrop(),
-    // the inbox leaves out my own group posts (ADR 0033); a group's view lists them, and marking it read covers them
-    input.group_id ? undefined : notOwnGroupPost(),
-    // `up_to` comes from a list, whose timestamps are milliseconds; the column holds microseconds, so compare at the
-    // list's precision or the newest drop shown would count as "later" and stay unread.
-    sql`date_trunc('milliseconds', ${deliveries.receivedAt}) <= ${upTo.toISOString()}::timestamptz`,
-    groupCond,
-  );
-  const max = LIMITS.MARK_ALL_READ_MAX;
-  const candidates = await tx
-    .selectDistinct({ id: deliveries.dropId })
-    .from(deliveries)
-    .innerJoin(drops, eq(drops.id, deliveries.dropId))
-    .where(unreadInView)
-    .orderBy(deliveries.dropId)
-    .limit(max);
-  const events = await markReadForPerson(
-    tx,
-    scope.userId,
-    candidates.map((c) => c.id),
-  );
-  await bumpMailboxes(tx, events);
-  const left = await tx
-    .select({ n: sql<number>`count(distinct ${deliveries.dropId})::int` })
-    .from(deliveries)
-    .innerJoin(drops, eq(drops.id, deliveries.dropId))
-    .where(unreadInView);
-  return {
-    marked: new Set(events.map((e) => e.dropId)).size,
-    remaining: left[0]?.n ?? 0,
-    unread_count: await unreadCountForEndpoints(tx, visibility.hIds),
   };
 }
 

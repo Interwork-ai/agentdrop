@@ -97,7 +97,7 @@ describe('Stop notification state', () => {
       calls++;
       if (calls === 1) return waiting;
       const later = Array.from({ length: calls - 1 }, (_, i) => ({
-        drop_id: `${i + 1}`.repeat(8) + '-0000-4000-8000-000000000000',
+        drop_id: `${`${i + 1}`.repeat(8)}-0000-4000-8000-000000000000`,
         title: `Later ${i + 1}`,
         author: { handle: 'bob', display_label: 'Bob' },
         attachment_count: 0,

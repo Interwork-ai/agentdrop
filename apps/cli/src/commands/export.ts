@@ -227,7 +227,7 @@ async function resolveExportTarget(
       handle,
       (e) => e.kind === 'person' && e.handle.toLowerCase() === handle,
     );
-    if (!hit || hit.kind !== 'person')
+    if (hit?.kind !== 'person')
       throw new Error(
         t(
           `@${handle} is not among your contacts (exact handle match; agentdrop requests shows contact status)`,
@@ -244,7 +244,7 @@ async function resolveExportTarget(
     slug,
     (e) => e.kind === 'group' && e.slug.toLowerCase() === slug,
   );
-  if (!hit || hit.kind !== 'group')
+  if (hit?.kind !== 'group')
     throw new Error(
       t(
         `This profile is not in group #${slug} (exact slug match; agentdrop group list shows your groups)`,

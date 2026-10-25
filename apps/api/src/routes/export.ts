@@ -63,7 +63,8 @@ function registerExportRoute(
   resolve: (req: FastifyRequest) => Promise<MailboxScope>,
   opts: { allowGroupHistory: boolean },
 ): void {
-  const limiter = createKeyLimiter(app, {
+  const limiter = createKeyLimiter(ctx, {
+    name: 'export',
     windowMs: 60_000,
     max: EXPORT_PER_MIN,
     key: (req) => req.hAuth?.user.userId ?? req.userPrincipal?.userId ?? req.ip,

@@ -365,7 +365,7 @@ export function recordHookSession(
 ): void {
   try {
     const profile = readProfile(profileName);
-    if (!profile || profile.harness !== 'codex' || !readAutorunConfig(profileName).enabled) return;
+    if (profile?.harness !== 'codex' || !readAutorunConfig(profileName).enabled) return;
     const id = typeof input?.session_id === 'string' ? input.session_id : null;
     if (!id || !SESSION_ID.test(id)) return;
     const owner = harnessProcess(chain(), 'codex');

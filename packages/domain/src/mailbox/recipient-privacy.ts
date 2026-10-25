@@ -7,7 +7,20 @@ import {
   recipientRoutes,
   type Tx,
 } from '@agentdrop/db';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray, or } from 'drizzle-orm';
+
+interface Snapshot {
+  versions?: Array<{ kind: string; id: string }>;
+  endpoints?: Array<[string, Array<{ groupId?: string }>]>;
+  group_ids?: string[];
+}
+
+/** One stored snapshot to render: its recipients, the snapshot they came from, and the drop it is (null for an approval). */
+export interface StoredRecipients {
+  raw: unknown;
+  snapshot?: unknown;
+  dropId?: string | null | undefined;
+}
 
 /** Render stored snapshots under today's visibility policy, including pre-privacy sends and approvals. */
 export async function privateRecipients(
@@ -17,67 +30,118 @@ export async function privateRecipients(
   rawSnapshot: unknown = {},
   dropId?: string | null,
 ): Promise<ResolvedRecipient[]> {
-  const snapshot = (rawSnapshot ?? {}) as {
-    versions?: Array<{ kind: string; id: string }>;
-    endpoints?: Array<[string, Array<{ groupId?: string }>]>;
-    group_ids?: string[];
-  };
-  const parsed = resolvedRecipientSchema.array().safeParse(raw);
-  if (!parsed.success) return [];
+  return (await privateRecipientsMany(tx, viewerUserId, [{ raw, snapshot: rawSnapshot, dropId }]))[0] ?? [];
+}
+
+/**
+ * `privateRecipients` for many snapshots at once, in the same order: a list page costs a fixed number of queries
+ * (the viewer, the group deliveries of every drop, the published entries named) however many drops it shows.
+ */
+export async function privateRecipientsMany(
+  tx: Tx,
+  viewerUserId: string,
+  items: StoredRecipients[],
+): Promise<ResolvedRecipient[][]> {
+  const parsed = items.map((item) => {
+    const recipients = resolvedRecipientSchema.array().safeParse(item.raw);
+    return {
+      ...item,
+      snapshot: (item.snapshot ?? {}) as Snapshot,
+      recipients: recipients.success ? recipients.data : null,
+    };
+  });
+  if (parsed.every((p) => !p.recipients)) return parsed.map(() => []);
   const me = await tx.query.appUsers.findFirst({ where: eq(appUsers.id, viewerUserId) });
-  const groupIds =
-    snapshot.group_ids ?? snapshot.versions?.filter((v) => v.kind === 'group').map((v) => v.id) ?? [];
-  const groupPeople = new Map<string, Set<string>>();
-  const add = (groupId: string | null | undefined, userId: string) => {
-    if (!groupId || userId === viewerUserId) return;
-    const members = groupPeople.get(groupId) ?? new Set<string>();
-    members.add(userId);
-    groupPeople.set(groupId, members);
-  };
-  if (parsed.data.some((r) => r.type === 'group')) {
-    if (dropId) {
-      const rows = await tx
-        .select({ userId: harnessEndpoints.userId, groupId: deliveryGrants.groupId })
+
+  // Who other than the viewer each group reached: from the drop's deliveries, or an approval's frozen endpoints.
+  const withGroups = parsed.filter((p) => p.recipients?.some((r) => r.type === 'group'));
+  const dropIds = [...new Set(withGroups.map((p) => p.dropId).filter((id): id is string => Boolean(id)))];
+  const deliveredTo = dropIds.length
+    ? await tx
+        .select({
+          dropId: deliveries.dropId,
+          userId: harnessEndpoints.userId,
+          groupId: deliveryGrants.groupId,
+        })
         .from(deliveries)
         .innerJoin(harnessEndpoints, eq(harnessEndpoints.id, deliveries.hId))
         .innerJoin(deliveryGrants, eq(deliveryGrants.deliveryId, deliveries.id))
-        .where(eq(deliveries.dropId, dropId));
-      for (const row of rows) add(row.groupId, row.userId);
-    } else {
-      for (const [hId, grants] of snapshot.endpoints ?? []) {
-        const h = await tx.query.harnessEndpoints.findFirst({ where: eq(harnessEndpoints.id, hId) });
-        if (h) for (const grant of grants) add(grant.groupId, h.userId);
-      }
+        .where(inArray(deliveries.dropId, dropIds))
+    : [];
+  const frozenHIds = [
+    ...new Set(
+      withGroups.filter((p) => !p.dropId).flatMap((p) => (p.snapshot.endpoints ?? []).map(([hId]) => hId)),
+    ),
+  ];
+  const ownerOf = new Map(
+    (frozenHIds.length
+      ? await tx
+          .select({ id: harnessEndpoints.id, userId: harnessEndpoints.userId })
+          .from(harnessEndpoints)
+          .where(inArray(harnessEndpoints.id, frozenHIds))
+      : []
+    ).map((h) => [h.id, h.userId]),
+  );
+
+  // Only an intentionally published entry may keep its alias; automatic aliases in old rows are private.
+  const named = new Map<string, { handle: string; alias: string }>();
+  for (const p of parsed)
+    for (const r of p.recipients ?? []) {
+      const m = /^@([^/\s]+)\/([^\s]+)$/.exec(r.label);
+      if (m?.[1] && m[2] && m[1].toLowerCase() !== me?.handle.toLowerCase())
+        named.set(`${m[1].toLowerCase()}/${m[2]}`, { handle: m[1].toLowerCase(), alias: m[2] });
     }
-  }
-  let groupIndex = 0;
-  return Promise.all(
-    parsed.data.map(async (r) => {
+  const publishedRows = named.size
+    ? await tx
+        .select({ handle: appUsers.handle, alias: recipientRoutes.alias })
+        .from(recipientRoutes)
+        .innerJoin(appUsers, eq(appUsers.id, recipientRoutes.userId))
+        .where(
+          and(
+            or(
+              ...[...named.values()].map((n) =>
+                and(eq(appUsers.handle, n.handle), eq(recipientRoutes.alias, n.alias)),
+              ),
+            ),
+            eq(recipientRoutes.auto, false),
+            eq(recipientRoutes.isDefault, false),
+            eq(recipientRoutes.visibility, 'contacts'),
+          ),
+        )
+    : [];
+  const published = new Set(publishedRows.map((row) => `${row.handle}/${row.alias}`));
+
+  return parsed.map((p) => {
+    if (!p.recipients) return [];
+    const groupPeople = new Map<string, Set<string>>();
+    const add = (groupId: string | null | undefined, userId: string | undefined) => {
+      if (!groupId || !userId || userId === viewerUserId) return;
+      const members = groupPeople.get(groupId) ?? new Set<string>();
+      members.add(userId);
+      groupPeople.set(groupId, members);
+    };
+    if (p.dropId) {
+      for (const row of deliveredTo) if (row.dropId === p.dropId) add(row.groupId, row.userId);
+    } else {
+      for (const [hId, grants] of p.snapshot.endpoints ?? [])
+        for (const g of grants) add(g.groupId, ownerOf.get(hId));
+    }
+    const groupIds =
+      p.snapshot.group_ids ?? p.snapshot.versions?.filter((v) => v.kind === 'group').map((v) => v.id) ?? [];
+    let groupIndex = 0;
+    return p.recipients.map((r) => {
       if (r.type === 'group')
         return { ...r, endpoint_count: groupPeople.get(groupIds[groupIndex++] ?? '')?.size ?? 0 };
       const match = /^@([^/\s]+)(?:\/([^\s]+))?$/.exec(r.label);
       const handle = match?.[1];
       if (handle?.toLowerCase() === me?.handle.toLowerCase()) return r;
-      let label = handle ? `@${handle}` : 'recipient';
-      // Only an intentionally published entry may retain its alias; automatic aliases in old rows are private.
-      if (handle && match?.[2]) {
-        const [named] = await tx
-          .select({ id: recipientRoutes.id })
-          .from(recipientRoutes)
-          .innerJoin(appUsers, eq(appUsers.id, recipientRoutes.userId))
-          .where(
-            and(
-              eq(appUsers.handle, handle),
-              eq(recipientRoutes.alias, match[2]),
-              eq(recipientRoutes.auto, false),
-              eq(recipientRoutes.isDefault, false),
-              eq(recipientRoutes.visibility, 'contacts'),
-            ),
-          )
-          .limit(1);
-        if (named) label = r.label;
-      }
+      const label =
+        handle && match?.[2] && published.has(`${handle.toLowerCase()}/${match[2]}`)
+          ? r.label
+          : handle
+            ? `@${handle}`
+            : 'recipient';
       return { ...r, label, endpoint_count: 1, address: label, endpoint_label: null, harness_key: null };
-    }),
-  );
+    });
+  });
 }

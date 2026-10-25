@@ -32,7 +32,7 @@ export function inviteLinkUrl(ctx: AppContext, token: string): string {
 
 /** Unauthenticated preview of a contact invite link: inviter name and whether it still works. Rate limited. */
 export async function inviteLinkPublicRoutes(app: FastifyInstance, ctx: AppContext): Promise<void> {
-  const limiter = createIpLimiter(app, { windowMs: 60_000, max: 60 });
+  const limiter = createIpLimiter(ctx, { name: 'invite-preview', windowMs: 60_000, max: 60 });
   app.get('/v1/invite/:token', { preHandler: [limiter] }, async (req) => {
     const { token } = parse(tokenParam, req.params);
     return previewInviteLink(ctx.db.drizzle, token);

@@ -13,8 +13,8 @@ import {
 import { and, count, eq, gt, isNull, lt } from 'drizzle-orm';
 import { recordAudit } from '../audit.js';
 import { hasValidGrant } from '../mailbox/authorization.js';
-import { markReadForPerson, setDropState } from '../mailbox/read.js';
 import { bumpMailboxes } from '../mailbox/revision.js';
+import { markReadForPerson, setDropState } from '../mailbox/state.js';
 import { type FeishuItem, feishuNoticeText, type NoticeLanguage } from './feishu.js';
 
 /*

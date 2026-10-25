@@ -2,11 +2,12 @@ import { AgentDropError } from '@agentdrop/contracts';
 import {
   type AuthenticatedH,
   authenticateHCredential,
+  consumeRateLimit,
   getUserByAuthId,
   type HPrincipal,
   type UserPrincipal,
 } from '@agentdrop/domain';
-import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import type { FastifyReply, FastifyRequest } from 'fastify';
 import { authHeaders } from '../auth.js';
 import type { AppContext } from '../context.js';
 
@@ -87,36 +88,28 @@ export function userPrincipalOf(req: FastifyRequest): UserPrincipal {
   return req.userPrincipal;
 }
 
-/** Simple fixed-window limiter for unauthenticated endpoints (pairing). Per-process; fine for a single API. */
-export function createIpLimiter(app: FastifyInstance, opts: { windowMs: number; max: number }) {
-  return createKeyLimiter(app, { ...opts, key: (req) => req.ip });
+/** A fixed-window limit per client address (pairing, invite previews, password reset). */
+export function createIpLimiter(ctx: AppContext, opts: { name: string; windowMs: number; max: number }) {
+  return createKeyLimiter(ctx, { ...opts, key: (req) => req.ip });
 }
 
 /**
  * The same window, keyed by whatever identifies the caller. Authenticated bulk routes want the account, not the
  * address: per-IP both punishes everyone behind one NAT and is sidestepped by moving the same credential to a
- * second address.
+ * second address. Counted in the shared `rate_limits` table, so every API process enforces one limit; `name` keeps
+ * one limiter's keys apart from another's.
  */
 export function createKeyLimiter(
-  app: FastifyInstance,
-  opts: { windowMs: number; max: number; key: (req: FastifyRequest) => string },
+  ctx: AppContext,
+  opts: { name: string; windowMs: number; max: number; key: (req: FastifyRequest) => string },
 ) {
-  const hits = new Map<string, { count: number; resetAt: number }>();
-  const sweep = setInterval(() => {
-    const now = Date.now();
-    for (const [k, v] of hits) if (v.resetAt <= now) hits.delete(k);
-  }, opts.windowMs);
-  sweep.unref();
-  app.addHook('onClose', async () => clearInterval(sweep));
   return async (req: FastifyRequest): Promise<void> => {
-    const key = opts.key(req);
-    const now = Date.now();
-    const cur = hits.get(key);
-    if (!cur || cur.resetAt <= now) {
-      hits.set(key, { count: 1, resetAt: now + opts.windowMs });
-      return;
-    }
-    cur.count += 1;
-    if (cur.count > opts.max) throw new AgentDropError('RATE_LIMITED');
+    const { allowed } = await consumeRateLimit(
+      ctx.db.drizzle,
+      `${opts.name}:${opts.key(req)}`,
+      opts.windowMs,
+      opts.max,
+    );
+    if (!allowed) throw new AgentDropError('RATE_LIMITED');
   };
 }

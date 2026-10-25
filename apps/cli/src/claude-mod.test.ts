@@ -1770,7 +1770,7 @@ describe('the mod when things go wrong', () => {
     expect(plain).toContain('Mark read only the ones you explained in detail');
     expect(plain).not.toContain('Focus on');
     // the person's own words, one line and capped
-    await s.command('agentdrop-read', '  wang #lab\n ablation run\u0007 ' + 'x'.repeat(400));
+    await s.command('agentdrop-read', `  wang #lab\n ablation run\u0007 ${'x'.repeat(400)}`);
     const focused = s.submitted[1] ?? '';
     expect(focused).toContain('Focus on: wang #lab ablation run ');
     expect(focused.includes('\n') || focused.includes('\u0007')).toBe(false);

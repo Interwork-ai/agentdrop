@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { StrictMode } from 'react';
+import { lazy, StrictMode, Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
 // Bundled fonts: the CSP allows only this origin, so a font CDN would never load in production.
@@ -9,7 +9,6 @@ import '@fontsource/ibm-plex-mono/500.css';
 import './index.css';
 import { syncLangForNotifications } from './lib/lang.js';
 import { SessionProvider } from './lib/session.js';
-import { AdminPage } from './pages/admin.jsx';
 import { AgentsPage } from './pages/agents.jsx';
 import { LoginPage, SignupPage } from './pages/auth.jsx';
 import { ComposePage } from './pages/compose.jsx';
@@ -17,7 +16,6 @@ import { ContactsPage } from './pages/contacts.jsx';
 import { GroupsPage } from './pages/groups.jsx';
 import { HelpPage } from './pages/help.jsx';
 import { InvitePage } from './pages/invite.jsx';
-import { LandingPage } from './pages/landing.jsx';
 import { MailboxPage } from './pages/mailbox.jsx';
 import { ApprovalsPage, ConnectionsPage, SettingsPage } from './pages/misc.jsx';
 import { PairPage } from './pages/pair.jsx';
@@ -27,6 +25,20 @@ import { SpacePage } from './pages/space.jsx';
 import { PublicPageTitle } from './ui/document-title.jsx';
 import { PageErrorBoundary } from './ui/error-boundary.jsx';
 import { NotificationNavigation } from './ui/notification-navigation.jsx';
+
+// Loaded on first visit: the landing page is for people who are not signed in, the console for administrators;
+// neither belongs in the bundle every signed-in person downloads.
+const LandingPage = lazy(() => import('./pages/landing.jsx').then((m) => ({ default: m.LandingPage })));
+const AdminPage = lazy(() => import('./pages/admin.jsx').then((m) => ({ default: m.AdminPage })));
+
+/** The console, loaded with the first admin page opened. */
+function Admin({ section }: { section: 'overview' | 'users' | 'audit' | 'settings' }) {
+  return (
+    <Suspense fallback={null}>
+      <AdminPage section={section} />
+    </Suspense>
+  );
+}
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: true, staleTime: 2_000 } },
@@ -46,7 +58,14 @@ createRoot(root).render(
           <PublicPageTitle />
           <PageErrorBoundary>
             <Routes>
-              <Route path="/" element={<LandingPage />} />
+              <Route
+                path="/"
+                element={
+                  <Suspense fallback={null}>
+                    <LandingPage />
+                  </Suspense>
+                }
+              />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/signup" element={<SignupPage />} />
               <Route path="/pair" element={<PairPage />} />
@@ -75,11 +94,11 @@ createRoot(root).render(
                 <Route path="approvals/:approvalId" element={<ApprovalsPage />} />
                 <Route path="settings" element={<SettingsPage />} />
                 <Route path="help" element={<HelpPage />} />
-                <Route path="admin" element={<AdminPage section="overview" />} />
-                <Route path="admin/users" element={<AdminPage section="users" />} />
-                <Route path="admin/users/:id" element={<AdminPage section="users" />} />
-                <Route path="admin/audit" element={<AdminPage section="audit" />} />
-                <Route path="admin/settings" element={<AdminPage section="settings" />} />
+                <Route path="admin" element={<Admin section="overview" />} />
+                <Route path="admin/users" element={<Admin section="users" />} />
+                <Route path="admin/users/:id" element={<Admin section="users" />} />
+                <Route path="admin/audit" element={<Admin section="audit" />} />
+                <Route path="admin/settings" element={<Admin section="settings" />} />
               </Route>
               <Route path="/approvals/:approvalId" element={<Navigate to="/app/approvals" replace />} />
               <Route path="*" element={<Navigate to="/app/inbox" replace />} />

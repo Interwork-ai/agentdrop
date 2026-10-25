@@ -66,7 +66,8 @@ export async function hIdentityRoutes(app: FastifyInstance, ctx: AppContext): Pr
    * Getting back into the account from a paired device (ADR 0036): `agentdrop account recover`, run by the person
    * at a terminal, gets a one-time reset link for the web password. Not an MCP tool. A few per hour per account.
    */
-  const recoverLimiter = createKeyLimiter(app, {
+  const recoverLimiter = createKeyLimiter(ctx, {
+    name: 'agent-recover',
     windowMs: 3_600_000,
     max: 5,
     key: (req) => `recover:${req.hAuth?.principal.userId ?? req.ip}`,

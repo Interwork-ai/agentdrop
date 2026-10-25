@@ -49,8 +49,13 @@ const RECOVERY_ATTEMPTS_PER_IP_PER_HOUR = 20;
 const RECOVERY_ATTEMPTS_PER_EMAIL_PER_HOUR = 5;
 
 export async function authRoutes(app: FastifyInstance, ctx: AppContext): Promise<void> {
-  const resetIpLimiter = createIpLimiter(app, { windowMs: 3_600_000, max: RESET_REQUESTS_PER_IP_PER_HOUR });
-  const resetEmailLimiter = createKeyLimiter(app, {
+  const resetIpLimiter = createIpLimiter(ctx, {
+    name: 'reset-ip',
+    windowMs: 3_600_000,
+    max: RESET_REQUESTS_PER_IP_PER_HOUR,
+  });
+  const resetEmailLimiter = createKeyLimiter(ctx, {
+    name: 'reset-email',
     windowMs: 3_600_000,
     max: RESET_REQUESTS_PER_EMAIL_PER_HOUR,
     key: (req) => {
@@ -96,11 +101,13 @@ export async function authRoutes(app: FastifyInstance, ctx: AppContext): Promise
    * returns a one-time reset link. Every failure answers alike, so it says nothing about which accounts exist;
    * attempts are limited per address and per email.
    */
-  const recoverIpLimiter = createIpLimiter(app, {
+  const recoverIpLimiter = createIpLimiter(ctx, {
+    name: 'recover-ip',
     windowMs: 3_600_000,
     max: RECOVERY_ATTEMPTS_PER_IP_PER_HOUR,
   });
-  const recoverEmailLimiter = createKeyLimiter(app, {
+  const recoverEmailLimiter = createKeyLimiter(ctx, {
+    name: 'recover-email',
     windowMs: 3_600_000,
     max: RECOVERY_ATTEMPTS_PER_EMAIL_PER_HOUR,
     key: (req) => {

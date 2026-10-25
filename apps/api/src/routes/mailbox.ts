@@ -22,6 +22,7 @@ import {
   pendingCounts,
   readDrop,
   readEvents,
+  type SendOptions,
   sendDrop,
   sendRequestStatus,
   setDropState,
@@ -32,7 +33,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { AppContext } from '../context.js';
 import { type EventHub, type StreamLimits, streamLimits } from '../events.js';
 import { bridgeBefore0411, trimNewerFieldsForOldBridges } from '../plugins/old-bridge.js';
-import { requireH, requireUser, userPrincipalOf } from '../plugins/principals.js';
+import { createKeyLimiter, requireH, requireUser, userPrincipalOf } from '../plugins/principals.js';
 import { parse } from '../plugins/validate.js';
 
 const SEARCH_PER_MINUTE = 30;
@@ -135,23 +136,25 @@ function registerMailboxRoutes(
     });
   });
 
-  const searches = new Map<string, { count: number; resetAt: number; running: number }>();
-  /** At most SEARCH_PER_MINUTE searches per person per minute and SEARCH_CONCURRENT at a time. */
-  const searchSlot = (userId: string): (() => void) => {
-    const now = Date.now();
-    let s = searches.get(userId);
-    if (!s || s.resetAt <= now) {
-      s = { count: 0, resetAt: now + 60_000, running: s?.running ?? 0 };
-      searches.set(userId, s);
-    }
-    if (s.count >= SEARCH_PER_MINUTE || s.running >= SEARCH_CONCURRENT)
-      throw new AgentDropError('RATE_LIMITED');
-    s.count += 1;
-    s.running += 1;
-    const slot = s;
+  /*
+   * A search decrypts and reads up to SEARCH_SCAN_LIMIT messages. At most SEARCH_PER_MINUTE per person per minute,
+   * counted across every API process; at most SEARCH_CONCURRENT at a time in this process, which is the CPU it uses.
+   */
+  const perMinute = createKeyLimiter(ctx, {
+    name: 'search',
+    windowMs: 60_000,
+    max: SEARCH_PER_MINUTE,
+    key: (req) => (req.hAuth?.user.userId ?? req.userPrincipal?.userId ?? req.ip) as string,
+  });
+  const running = new Map<string, number>();
+  const searchSlot = async (req: FastifyRequest, userId: string): Promise<() => void> => {
+    if ((running.get(userId) ?? 0) >= SEARCH_CONCURRENT) throw new AgentDropError('RATE_LIMITED');
+    await perMinute(req);
+    running.set(userId, (running.get(userId) ?? 0) + 1);
     return () => {
-      slot.running -= 1;
-      if (slot.running === 0 && slot.resetAt <= Date.now()) searches.delete(userId);
+      const left = (running.get(userId) ?? 1) - 1;
+      if (left <= 0) running.delete(userId);
+      else running.set(userId, left);
     };
   };
 
@@ -159,7 +162,7 @@ function registerMailboxRoutes(
     const scope = await resolve(req);
     const input = parse(listDropsInputSchema, coerceQuery(req.query));
     // a search decrypts and reads up to SEARCH_SCAN_LIMIT messages: bounded per person (docs/plan/CONTENT_ENCRYPTION.md §9)
-    const release = input.query?.trim() ? searchSlot(scope.userId) : () => {};
+    const release = input.query?.trim() ? await searchSlot(req, scope.userId) : () => {};
     let res: Awaited<ReturnType<typeof listDrops>>;
     try {
       res = await listDrops(ctx.db.drizzle, scope, input);
@@ -188,18 +191,18 @@ function registerMailboxRoutes(
     return { drop: trimReceiptsForOldBridge(req, labelled ?? drop), viewer: await buildViewer(ctx, scope) };
   });
 
+  const sendOptions = (scope: MailboxScope): SendOptions => ({
+    originKind: scope.via === 'h_credential' ? 'mcp' : 'web',
+    maxGroupRecipients: ctx.config.MAX_GROUP_RECIPIENTS,
+    maxDropFileBytes: ctx.config.MAX_DROP_FILE_BYTES,
+    ...(ctx.approvalPolicy ? { approvalPolicy: ctx.approvalPolicy } : {}),
+    approvalUrlFor: (id) => `${ctx.config.WEB_ORIGIN ?? ctx.config.PUBLIC_BASE_URL}/approvals/${id}`,
+  });
+
   app.post(`${prefix}/drops`, async (req, reply) => {
     const scope = await resolve(req);
     const input = parse(sendDropInputSchema, req.body);
-    const res = await withTx(ctx.db, (tx) =>
-      sendDrop(tx, scope, input, {
-        originKind: scope.via === 'h_credential' ? 'mcp' : 'web',
-        maxGroupRecipients: ctx.config.MAX_GROUP_RECIPIENTS,
-        maxDropFileBytes: ctx.config.MAX_DROP_FILE_BYTES,
-        ...(ctx.approvalPolicy ? { approvalPolicy: ctx.approvalPolicy } : {}),
-        approvalUrlFor: (id) => `${ctx.config.WEB_ORIGIN ?? ctx.config.PUBLIC_BASE_URL}/approvals/${id}`,
-      }),
-    );
+    const res = await withTx(ctx.db, (tx) => sendDrop(tx, scope, input, sendOptions(scope)));
     const viewer = await buildViewer(ctx, scope);
     reply.status(res.outcome === 'needs_approval' ? 202 : 200);
     return trimForLegacyBridge(req, {
