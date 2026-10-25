@@ -8096,6 +8096,407 @@
           }
         }
       }
+    },
+    "/v1/me/feishu-app": {
+      "get": {
+        "summary": "Whether the server has a Feishu app and whether the person's Feishu account is linked (ADR 0039)",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "available": {
+                      "type": "boolean"
+                    },
+                    "linked": {
+                      "type": "boolean"
+                    },
+                    "bot_link": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "linked_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "available",
+                    "linked",
+                    "bot_link",
+                    "linked_at"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "UNAUTHORIZED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "VALIDATION_FAILED",
+                        "PAYLOAD_TOO_LARGE",
+                        "IDEMPOTENCY_CONFLICT",
+                        "VERSION_CONFLICT",
+                        "NO_DELIVERY_ROUTE",
+                        "PREFERRED_ROUTE_UNAVAILABLE",
+                        "ROUTE_UNAVAILABLE",
+                        "GROUP_RECIPIENT_UNAVAILABLE",
+                        "TOO_MANY_RECIPIENTS",
+                        "AMBIGUOUS_TARGET",
+                        "NOT_A_CONTACT",
+                        "BLOCKED",
+                        "ATTACHMENT_NOT_READY",
+                        "ATTACHMENT_NOT_OWNED",
+                        "PATH_NOT_ALLOWED",
+                        "FILE_TOO_LARGE",
+                        "QUOTA_EXCEEDED",
+                        "GROUP_STORAGE_FULL",
+                        "FILE_REMOVED",
+                        "NEEDS_APPROVAL",
+                        "STALE_APPROVAL",
+                        "APPROVAL_EXPIRED",
+                        "RESYNC_REQUIRED",
+                        "ACCOUNT_SUSPENDED",
+                        "SIGNUP_DISABLED",
+                        "ENDPOINT_REVOKED",
+                        "AGENT_REQUIRED",
+                        "RATE_LIMITED",
+                        "UPSTREAM_UNAVAILABLE",
+                        "NETWORK_ERROR",
+                        "INTERNAL"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "next_action": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "details": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "next_action",
+                    "retryable"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Unlink the Feishu account; notices go back to the group bot, if any",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "available": {
+                      "type": "boolean"
+                    },
+                    "linked": {
+                      "type": "boolean"
+                    },
+                    "bot_link": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "linked_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "available",
+                    "linked",
+                    "bot_link",
+                    "linked_at"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "UNAUTHORIZED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "VALIDATION_FAILED",
+                        "PAYLOAD_TOO_LARGE",
+                        "IDEMPOTENCY_CONFLICT",
+                        "VERSION_CONFLICT",
+                        "NO_DELIVERY_ROUTE",
+                        "PREFERRED_ROUTE_UNAVAILABLE",
+                        "ROUTE_UNAVAILABLE",
+                        "GROUP_RECIPIENT_UNAVAILABLE",
+                        "TOO_MANY_RECIPIENTS",
+                        "AMBIGUOUS_TARGET",
+                        "NOT_A_CONTACT",
+                        "BLOCKED",
+                        "ATTACHMENT_NOT_READY",
+                        "ATTACHMENT_NOT_OWNED",
+                        "PATH_NOT_ALLOWED",
+                        "FILE_TOO_LARGE",
+                        "QUOTA_EXCEEDED",
+                        "GROUP_STORAGE_FULL",
+                        "FILE_REMOVED",
+                        "NEEDS_APPROVAL",
+                        "STALE_APPROVAL",
+                        "APPROVAL_EXPIRED",
+                        "RESYNC_REQUIRED",
+                        "ACCOUNT_SUSPENDED",
+                        "SIGNUP_DISABLED",
+                        "ENDPOINT_REVOKED",
+                        "AGENT_REQUIRED",
+                        "RATE_LIMITED",
+                        "UPSTREAM_UNAVAILABLE",
+                        "NETWORK_ERROR",
+                        "INTERNAL"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "next_action": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "details": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "next_action",
+                    "retryable"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/feishu-app/code": {
+      "post": {
+        "summary": "A one-time code to send to the Feishu bot, linking the Feishu account (10 minutes)",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "expires_at": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                    },
+                    "bot_link": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "expires_at",
+                    "bot_link"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "UNAUTHORIZED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "VALIDATION_FAILED",
+                        "PAYLOAD_TOO_LARGE",
+                        "IDEMPOTENCY_CONFLICT",
+                        "VERSION_CONFLICT",
+                        "NO_DELIVERY_ROUTE",
+                        "PREFERRED_ROUTE_UNAVAILABLE",
+                        "ROUTE_UNAVAILABLE",
+                        "GROUP_RECIPIENT_UNAVAILABLE",
+                        "TOO_MANY_RECIPIENTS",
+                        "AMBIGUOUS_TARGET",
+                        "NOT_A_CONTACT",
+                        "BLOCKED",
+                        "ATTACHMENT_NOT_READY",
+                        "ATTACHMENT_NOT_OWNED",
+                        "PATH_NOT_ALLOWED",
+                        "FILE_TOO_LARGE",
+                        "QUOTA_EXCEEDED",
+                        "GROUP_STORAGE_FULL",
+                        "FILE_REMOVED",
+                        "NEEDS_APPROVAL",
+                        "STALE_APPROVAL",
+                        "APPROVAL_EXPIRED",
+                        "RESYNC_REQUIRED",
+                        "ACCOUNT_SUSPENDED",
+                        "SIGNUP_DISABLED",
+                        "ENDPOINT_REVOKED",
+                        "AGENT_REQUIRED",
+                        "RATE_LIMITED",
+                        "UPSTREAM_UNAVAILABLE",
+                        "NETWORK_ERROR",
+                        "INTERNAL"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "next_action": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "details": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "next_action",
+                    "retryable"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "language": {
+                    "type": "string",
+                    "enum": [
+                      "en",
+                      "zh"
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
     }
   }
 }

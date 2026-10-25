@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { HarnessKey } from '@agentdrop/contracts';
 import { createDatabase, type Database, runMigrations } from '@agentdrop/db';
-import { defaultApprovalPolicy, type SendOptions } from '@agentdrop/domain';
+import { defaultApprovalPolicy, type FeishuAppConfig, type SendOptions } from '@agentdrop/domain';
 import { FsStorage, type StorageProvider } from '@agentdrop/storage';
 import { sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
@@ -36,6 +36,8 @@ export async function createTestApp(
     wrapStorage?: (storage: StorageProvider) => StorageProvider;
     /** Stands in for Feishu when a test connects a group-bot webhook. */
     feishuFetch?: typeof fetch;
+    /** The server's own Feishu app (ADR 0039); absent: none configured. */
+    feishuApp?: FeishuAppConfig;
     /** Pairing starts allowed per address per minute; tests otherwise never meet the limit. */
     pairingStartPerMin?: number;
     /** Extra configuration values, e.g. a small GROUP_STORAGE_QUOTA_BYTES. */
@@ -92,6 +94,7 @@ export async function createTestApp(
         auth,
         mailer: options.mailer ?? null,
         ...(options.feishuFetch ? { feishuFetch: options.feishuFetch } : {}),
+        ...(options.feishuApp ? { feishuApp: options.feishuApp } : {}),
         approvalPolicy: options.approvalPolicy ?? defaultApprovalPolicy,
       },
       { logger: { level: 'error' } },

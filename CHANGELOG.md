@@ -22,6 +22,14 @@ Releases up to 0.4.12 predate this file.
 
 ### Added
 
+- Feishu cards from the server's own Feishu app (ADR 0039, docs/FEISHU.md §10): with `FEISHU_APP_ID` and
+  `FEISHU_APP_SECRET` set, Settings → Notifications offers "Feishu account". The person gets a one-time code and
+  sends it to the app's bot; notices then arrive as cards in that chat, with "Mark read", "Star" and "Open in
+  AgentDrop", and a card turns grey within a minute once the drop is read anywhere else. A linked account replaces
+  the group bot for that person. The worker holds an outbound WebSocket (no public endpoint needed) through the
+  pinned `@larksuiteoapi/node-sdk`; Compose keeps the secret out of the API. Migration `0034_feishu_app`; closing an
+  account removes its link.
+
 - A reply can say where the work the answered drop asked for stands: `payload.progress` `started`, `done`,
   `declined` or `needs_info`, only together with `reply_to` (migration `0033_reply_progress`, ADR 0038). The sender
   sees each person's latest progress on the drop they sent (`replies.authors[].progress`, the dashboard list and

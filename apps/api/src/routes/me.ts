@@ -3,6 +3,7 @@ import {
   clientSettingsUpdateInputSchema,
   displayNameSchema,
   feishuConnectInputSchema,
+  feishuLinkCodeInputSchema,
   pairingDecisionInputSchema,
   pushSubscriptionInputSchema,
   z,
@@ -11,8 +12,11 @@ import { withTx } from '@agentdrop/db';
 import {
   connectFeishuWebhook,
   contentEncryptionStatus,
+  createFeishuLinkCode,
   decidePairing,
   disconnectFeishuWebhook,
+  feishuAppView,
+  feishuBotLink,
   feishuView,
   generateRecoveryCodes,
   getDeviceClientSettings,
@@ -37,6 +41,7 @@ import {
   setPublicEmail,
   signInEmailOf,
   takeOverEndpoint,
+  unlinkFeishuAccount,
   updateDeviceClientSettings,
   updateDisplayName,
   upsertPushSubscription,
@@ -136,6 +141,29 @@ export async function meRoutes(app: FastifyInstance, ctx: AppContext): Promise<v
   app.delete('/v1/me/feishu', async (req) => {
     const p = userPrincipalOf(req);
     return withTx(ctx.db, (tx) => disconnectFeishuWebhook(tx, p.userId, 'dashboard'));
+  });
+
+  // Linking a Feishu account to the server's own Feishu app (ADR 0039, docs/FEISHU.md).
+  app.get('/v1/me/feishu-app', async (req) => {
+    const p = userPrincipalOf(req);
+    return withTx(ctx.db, (tx) => feishuAppView(tx, p.userId, ctx.feishuApp ?? null));
+  });
+
+  app.post('/v1/me/feishu-app/code', async (req) => {
+    const p = userPrincipalOf(req);
+    const body = parse(feishuLinkCodeInputSchema, req.body ?? {});
+    const app = ctx.feishuApp;
+    if (!app) throw new AgentDropError('NOT_FOUND', 'this server has no Feishu app configured');
+    const code = await withTx(ctx.db, (tx) => createFeishuLinkCode(tx, p.userId, body.language ?? 'en'));
+    return { ...code, bot_link: feishuBotLink(app) };
+  });
+
+  app.delete('/v1/me/feishu-app', async (req) => {
+    const p = userPrincipalOf(req);
+    return withTx(ctx.db, async (tx) => {
+      await unlinkFeishuAccount(tx, p.userId);
+      return feishuAppView(tx, p.userId, ctx.feishuApp ?? null);
+    });
   });
 
   app.patch('/v1/me/mailbox-settings', async (req) => {

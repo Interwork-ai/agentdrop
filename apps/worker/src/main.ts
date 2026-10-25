@@ -9,6 +9,7 @@ import { connections, createDatabase, withTx } from '@agentdrop/db';
 import {
   expireStagedAttachments,
   expireUnlinkedAttachments,
+  feishuAppConfigFromEnv,
   initContentEncryption,
   requestBackfill,
   sendUpdateReminders,
@@ -17,6 +18,8 @@ import { FsStorage, S3Storage, type StorageProvider } from '@agentdrop/storage';
 import { and, isNull, sql } from 'drizzle-orm';
 import pino from 'pino';
 import { z } from 'zod';
+import { startFeishuEvents } from './feishu-events.js';
+import { syncFeishuCards } from './feishu-sync.js';
 import { createHandlers } from './handlers.js';
 import { processOne } from './outbox.js';
 import { configureWebPush, loadWebPushConfig } from './push.js';
@@ -98,14 +101,19 @@ const webhookOptions: WebhookOptions = {
   onForbidden: (userId) => log.warn({ userId }, 'webhook refused: non-public address'),
 };
 
+// the server's own Feishu app (ADR 0039): off unless FEISHU_APP_ID and FEISHU_APP_SECRET are both set
+const feishuApp = feishuAppConfigFromEnv(process.env);
+const dashboard = config.WEB_ORIGIN ?? config.PUBLIC_BASE_URL ?? null;
+
 const handlers = createHandlers({
   db,
   storage,
   log,
   webPushConfig,
   webhookOptions,
-  dashboard: config.WEB_ORIGIN ?? config.PUBLIC_BASE_URL ?? null,
+  dashboard,
   fetch,
+  feishuApp,
 });
 
 let stopping = false;
@@ -167,7 +175,9 @@ async function main(): Promise<void> {
   log.info(encryption, 'content encryption');
   if (encryption.mode === 'on' && (await withTx(db, requestBackfill))) log.info('content backfill queued');
   log.info({ provider: storage.kind }, 'worker started');
+  const stopFeishu = feishuApp ? startFeishuEvents({ db, app: feishuApp, dashboard, fetch, log }) : null;
   let lastMaintenance = 0;
+  let lastFeishuSync = 0;
   while (!stopping) {
     let did = false;
     try {
@@ -186,11 +196,17 @@ async function main(): Promise<void> {
         await maintenance();
         lastMaintenance = Date.now();
       }
+      if (feishuApp && Date.now() - lastFeishuSync > 60 * 1000) {
+        lastFeishuSync = Date.now();
+        const changed = await syncFeishuCards(db, feishuApp, { dashboard, fetch });
+        if (changed) log.info({ count: changed }, 'feishu cards follow reads elsewhere');
+      }
     } catch (err) {
       log.error({ err }, 'worker loop error');
     }
     if (!did) await new Promise((r) => setTimeout(r, config.WORKER_POLL_MS));
   }
+  stopFeishu?.();
   await db.close();
 }
 

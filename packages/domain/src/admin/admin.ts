@@ -19,6 +19,9 @@ import {
   deliveries,
   devices,
   drops,
+  feishuAccounts,
+  feishuCards,
+  feishuLinkCodes,
   groupBindings,
   groupMemberships,
   groups,
@@ -497,6 +500,10 @@ export async function adminCloseAccount(
   // Browser push endpoints are bearer-like capabilities. Closing an account must stop notifications immediately,
   // including an outbox event that was committed shortly before closure and is processed afterward.
   await tx.delete(pushSubscriptions).where(eq(pushSubscriptions.userId, userId));
+  // so is a linked Feishu account (ADR 0039): no card goes to it again, and no card is updated
+  await tx.delete(feishuAccounts).where(eq(feishuAccounts.userId, userId));
+  await tx.delete(feishuCards).where(eq(feishuCards.userId, userId));
+  await tx.delete(feishuLinkCodes).where(eq(feishuLinkCodes.userId, userId));
 
   // 4. the profile: the handle is retired (not recycled) so old references stay unambiguous
   await tx

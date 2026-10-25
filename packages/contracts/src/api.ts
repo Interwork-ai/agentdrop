@@ -11,6 +11,7 @@ import { directoryLookupInputSchema, directoryLookupResultSchema } from './direc
 import { attachmentMetaSchema, dropIdSchema, hIdSchema, userIdSchema, viewerSchema } from './drop.js';
 import { apiErrorSchema } from './errors.js';
 import { exportInputSchema } from './export.js';
+import { feishuAppViewSchema, feishuLinkCodeInputSchema, feishuLinkCodeSchema } from './manage.js';
 import { displayNameSchema, harnessKeySchema } from './names.js';
 import {
   pushSettingsSchema,
@@ -438,5 +439,28 @@ export const USER_ROUTES = {
     summary: 'Set desired client settings for an active owned device',
     body: clientSettingsUpdateInputSchema,
     response: deviceClientSettingsSchema,
+  },
+  feishuApp: {
+    method: 'GET',
+    path: '/v1/me/feishu-app',
+    auth: 'user_session',
+    summary:
+      "Whether the server has a Feishu app and whether the person's Feishu account is linked (ADR 0039)",
+    response: feishuAppViewSchema,
+  },
+  feishuAppCode: {
+    method: 'POST',
+    path: '/v1/me/feishu-app/code',
+    auth: 'user_session',
+    summary: 'A one-time code to send to the Feishu bot, linking the Feishu account (10 minutes)',
+    body: feishuLinkCodeInputSchema,
+    response: feishuLinkCodeSchema,
+  },
+  feishuAppUnlink: {
+    method: 'DELETE',
+    path: '/v1/me/feishu-app',
+    auth: 'user_session',
+    summary: 'Unlink the Feishu account; notices go back to the group bot, if any',
+    response: feishuAppViewSchema,
   },
 } as const satisfies Record<string, RouteContract>;

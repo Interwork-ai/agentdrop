@@ -49,6 +49,14 @@ describe.skipIf(!hasCompose)('production Compose configuration (requires Docker 
     expect(postgres.environment.POSTGRES_PASSWORD).toBe('fixture-only-database-password');
   });
 
+  it('keeps the Feishu app secret out of the API; the worker gets it from the env file (ADR 0039)', () => {
+    const result = render('fixture-only-database-password');
+    expect(result.status, result.stderr).toBe(0);
+    const services = JSON.parse(result.stdout).services;
+    expect(services.api.environment.FEISHU_APP_SECRET).toBe('');
+    expect(services.worker.environment?.FEISHU_APP_SECRET).toBeUndefined();
+  });
+
   it('runs the image named in AGENTDROP_IMAGE and has no stale default', () => {
     const result = render('fixture-only-database-password');
     expect(result.status, result.stderr).toBe(0);

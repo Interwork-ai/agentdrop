@@ -44,3 +44,4 @@ record and set the old one's status to `Superseded by NNNN`. Link the record fro
 | [0036](0036-account-recovery-without-email.md) | Getting back into an account from a paired device or a recovery code, without email or an administrator | Accepted |
 | [0037](0037-workbuddy-harness.md) | WorkBuddy as the sixth harness, configured from a static reading of its bundle | Accepted |
 | [0038](0038-reply-progress.md) | A reply can say where the asked-for work stands | Accepted |
+| [0039](0039-feishu-app-cards.md) | Feishu notices as cards from the server's own Feishu app, to a linked account | Accepted |

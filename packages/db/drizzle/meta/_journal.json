@@ -239,6 +239,13 @@
       "when": 1792896820669,
       "tag": "0033_reply_progress",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1792897801027,
+      "tag": "0034_feishu_app",
+      "breakpoints": true
     }
   ]
 }

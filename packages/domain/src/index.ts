@@ -38,6 +38,7 @@ export * from './mailbox/space.js';
 export * from './mailbox/timeline.js';
 export * from './manage/manage.js';
 export * from './notify/feishu.js';
+export * from './notify/feishu-app.js';
 export * from './notify/feishu-settings.js';
 export * from './notify/update-reminders.js';
 export * from './principals.js';

@@ -167,18 +167,23 @@ export function isReplyTitle(title: string, original: string): boolean {
   return !!m && m[1]?.trim() === original.trim();
 }
 
+/** The one line a notice says, in the person's language: the same words on Feishu, the app's cards and push. */
+export function feishuNoticeText(item: FeishuItem, language: NoticeLanguage): string {
+  const zh = language === 'zh';
+  if (item.kind === 'test')
+    return zh
+      ? '连接成功：以后 AgentDrop 的新消息、联系人申请和群邀请会在这里提醒你，每条一次。'
+      : 'Connected: new AgentDrop messages, contact requests and group invitations will be announced here, each once.';
+  return noticeLine(item, zh);
+}
+
 /**
  * One rich-text (`post`) message. Every message contains "AgentDrop", so a bot secured with the custom keyword
  * "AgentDrop" accepts it. Received names and titles are shown as plain text only.
  */
 export function feishuMessage(item: FeishuItem, language: NoticeLanguage): Record<string, unknown> {
   const zh = language === 'zh';
-  const line =
-    item.kind === 'test'
-      ? zh
-        ? '连接成功：以后 AgentDrop 的新消息、联系人申请和群邀请会在这里提醒你，每条一次。'
-        : 'Connected: new AgentDrop messages, contact requests and group invitations will be announced here, each once.'
-      : noticeLine(item, zh);
+  const line = feishuNoticeText(item, language);
   const content: Array<Array<Record<string, string>>> = [[{ tag: 'text', text: line }]];
   if (item.link)
     content.push([{ tag: 'a', text: zh ? '在 AgentDrop 打开' : 'Open in AgentDrop', href: item.link }]);

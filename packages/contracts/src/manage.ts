@@ -124,6 +124,32 @@ export type ContactRemoval = z.infer<typeof contactRemovalSchema>;
 export type ContactRemoveResult = z.infer<typeof contactRemoveResultSchema>;
 
 /** Connecting a Feishu group-bot webhook for notices (docs/FEISHU.md). */
+/** Linking a Feishu account to the server's own Feishu app (ADR 0039): what the dashboard shows. */
+export const feishuAppViewSchema = z.object({
+  /** The server has a Feishu app configured (FEISHU_APP_ID and FEISHU_APP_SECRET). */
+  available: z.boolean(),
+  linked: z.boolean(),
+  /** Opens the direct chat with the app's bot in the Feishu client; null when no app is configured. */
+  bot_link: z.string().nullable(),
+  linked_at: z.iso.datetime().nullable(),
+});
+export type FeishuAppView = z.infer<typeof feishuAppViewSchema>;
+
+export const feishuLinkCodeInputSchema = z
+  .object({
+    /** The language cards are written in; the dashboard sends its own. */
+    language: z.enum(['en', 'zh']).optional(),
+  })
+  .strict();
+
+/** A one-time code the person sends to the bot within 10 minutes; any earlier code stops working. */
+export const feishuLinkCodeSchema = z.object({
+  code: z.string(),
+  expires_at: z.iso.datetime(),
+  bot_link: z.string(),
+});
+export type FeishuLinkCode = z.infer<typeof feishuLinkCodeSchema>;
+
 export const feishuConnectInputSchema = z
   .object({
     url: z.string().min(1).max(300),

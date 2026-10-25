@@ -3,6 +3,7 @@
 - Status: Accepted
 - Date: 2026-09-24
 - Guide: [docs/FEISHU.md](../FEISHU.md)
+- Refined by: ADR 0039 (cards from the server's own Feishu app to a linked account)
 
 ## Context
 

@@ -1,5 +1,5 @@
 import type { Database } from '@agentdrop/db';
-import type { SendOptions } from '@agentdrop/domain';
+import type { FeishuAppConfig, SendOptions } from '@agentdrop/domain';
 import type { StorageProvider } from '@agentdrop/storage';
 import type { Auth } from './auth.js';
 import type { AppConfig } from './config.js';
@@ -16,6 +16,8 @@ export interface AppContext {
   mailer?: Mailer | null;
   /** Outgoing requests to Feishu (connect test message). Tests replace it; production uses global fetch. */
   feishuFetch?: typeof fetch;
+  /** The server's own Feishu app (ADR 0039); null or undefined when the operator configured none. */
+  feishuApp?: FeishuAppConfig | null;
 }
 
 /** Where a person opens the dashboard: the browser origin when it differs from the API's public address. */

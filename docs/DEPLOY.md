@@ -37,6 +37,11 @@ Generate the VAPID keys once, for example with `pnpm dlx web-push generate-vapid
 turns Web Push off; the worker requires all three together. Compose passes the public key to the API and the
 browser, and explicitly keeps the private key and the subject out of the API process.
 
+Optional Feishu cards (docs/FEISHU.md §10): `FEISHU_APP_ID` and `FEISHU_APP_SECRET` of a self-built Feishu app with
+the bot capability, `im.message.receive_v1` and `card.action.trigger` in long-connection mode (`FEISHU_DOMAIN=lark`
+for Lark). The worker opens the connection outward, so no public endpoint is needed; Compose keeps the secret out of
+the API, which only shows the bot link.
+
 The API validates this at startup and refuses to boot with dev auth, filesystem storage, a placeholder or short
 secret, an `http://` public URL, or content logging enabled.
 

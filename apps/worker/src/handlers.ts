@@ -1,10 +1,11 @@
 import { appUsers, type Database, groupJoinRequests, withTx } from '@agentdrop/db';
-import { backfillStep, noticeKey, requestBackfill } from '@agentdrop/domain';
+import { backfillStep, type FeishuAppConfig, noticeKey, requestBackfill } from '@agentdrop/domain';
 import type { StorageProvider } from '@agentdrop/storage';
 import { and, eq, inArray } from 'drizzle-orm';
 import type { Logger } from 'pino';
 import { runAssistantEcho } from './assistant.js';
 import { sendFeishuNotices } from './feishu.js';
+import { dropNoticeItem } from './feishu-items.js';
 import type { Handler } from './outbox.js';
 import {
   type PushTarget,
@@ -33,6 +34,8 @@ export interface HandlerDeps {
   fetch: typeof fetch;
   /** Web Push transport; tests replace it. */
   sendPush?: SendNotification;
+  /** The server's own Feishu app (ADR 0039): linked people get cards instead of the group bot. */
+  feishuApp?: FeishuAppConfig | null;
 }
 
 /**
@@ -139,21 +142,18 @@ export function createHandlers(deps: HandlerDeps): Record<string, Handler> {
             userId: r.userId,
             list: 'drops' as const,
             key: noticeKey('drop', dropId),
-            item: {
-              kind: 'drop' as const,
-              fromName: audience?.sender.displayName ?? '',
-              group: r.group,
-              mentioned: r.mentioned,
-              replyTo: r.replyTo ?? null,
-              progress: r.replyTo ? (audience?.progress ?? null) : null,
-              fromHandle: audience?.sender.handle ?? '',
-              title: audience?.title ?? '',
-              link: link(`/app/inbox/${encodeURIComponent(dropId)}?h=${encodeURIComponent(r.hId)}`),
-            },
+            item: dropNoticeItem(
+              audience,
+              r,
+              link(`/app/inbox/${encodeURIComponent(dropId)}?h=${encodeURIComponent(r.hId)}`),
+            ),
+            // a linked Feishu account gets a card it can act on (ADR 0039)
+            drop: { dropId, hId: r.hId },
           })),
           context,
           deps.fetch,
           log,
+          deps.feishuApp ?? null,
         ),
         runAssistantEcho(db, dropId, payload, context.progress).then((outcome) => {
           if (outcome?.replied) log.info({ dropId, replyId: outcome.dropId }, 'assistant receipt sent');
@@ -195,6 +195,7 @@ export function createHandlers(deps: HandlerDeps): Record<string, Handler> {
               context,
               deps.fetch,
               log,
+              deps.feishuApp ?? null,
             )
           : Promise.resolve(),
         userId
@@ -260,6 +261,7 @@ export function createHandlers(deps: HandlerDeps): Record<string, Handler> {
               context,
               deps.fetch,
               log,
+              deps.feishuApp ?? null,
             )
           : Promise.resolve(),
         userId
@@ -325,6 +327,7 @@ export function createHandlers(deps: HandlerDeps): Record<string, Handler> {
               context,
               deps.fetch,
               log,
+              deps.feishuApp ?? null,
             )
           : Promise.resolve(),
         userId && items.length

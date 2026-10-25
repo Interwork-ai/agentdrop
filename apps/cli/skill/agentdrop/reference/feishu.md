@@ -4,6 +4,12 @@ Use this when the user asks to get AgentDrop notices in Feishu/Lark, to change o
 below applies. The server posts to a custom group bot the user adds; nothing runs on this machine afterwards. The
 full human guide is `docs/FEISHU.md` in the AgentDrop repository; keep to it.
 
+Some servers have their own Feishu app (ADR 0039): the user's dashboard then shows "Feishu account" under Settings →
+Notifications. That is the better way for them: notices arrive as cards in a chat with the app's bot and can be
+marked read there. Only the user can do it: tell the user to open Settings → Feishu account, press "Get a code" and
+send the code to the AgentDrop bot in Feishu. Never ask them to paste that code to you, and do not set up a group
+bot as well; a linked account replaces it. Use the group bot below when the dashboard shows no "Feishu account".
+
 What arrives: one line per new drop, contact request, group invitation or join request, with sender name, handle,
 drop title and an "Open in AgentDrop" link. Never the body or attachments. Each item is announced once across
 Feishu and the end-of-turn notices. Language follows `agentdrop settings --language` at connect time.

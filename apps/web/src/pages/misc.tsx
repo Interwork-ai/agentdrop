@@ -8,7 +8,7 @@ import { type Lang, setLang, useLang, useT } from '../lib/lang.js';
 import { useFocusAwareInterval, useSession } from '../lib/session.js';
 import { setTheme, type Theme, useTheme } from '../lib/theme.js';
 import { ClientSettings } from '../ui/client-settings.js';
-import { FeishuSettingsCard } from '../ui/feishu-settings.jsx';
+import { FeishuAppCard, FeishuSettingsCard } from '../ui/feishu-settings.jsx';
 import { Chip, EmptyState, MetaList, PageToolbar, Panel, Segmented } from '../ui/layout.jsx';
 import { Button, ErrorBox, Field, Input, Loading } from '../ui/primitives.jsx';
 import { PushSettingsCard } from '../ui/push-notifications.jsx';
@@ -439,6 +439,7 @@ export function SettingsPage() {
           </SettingsGroup>
 
           <SettingsGroup id="notifications" title={titles.notifications}>
+            <FeishuAppCard />
             <FeishuSettingsCard />
             <PushSettingsCard />
             <details className="card group rounded-xl border border-line">

@@ -170,6 +170,15 @@ async function settings(ctx, ann) {
       true,
     );
   });
+  await step('Feishu account: a one-time code and a link that opens the bot (ADR 0039)', async () => {
+    const card = page.locator('#feishu');
+    await card.getByRole('button', { name: 'Get a code' }).click();
+    const code = await card.getByLabel('Code to send to the bot').textContent();
+    if (!/^[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}$/.test(code ?? '')) throw new Error(`code is "${code}"`);
+    const href = await card.getByRole('link', { name: 'Open the bot in Feishu' }).getAttribute('href');
+    if (href !== 'https://applink.feishu.cn/client/bot/open?appId=cli_e2etestapp')
+      throw new Error(`bot link is ${href}`);
+  });
   await step('nickname and email persist after a reload', async () => {
     await page.reload();
     await see('Language & theme');

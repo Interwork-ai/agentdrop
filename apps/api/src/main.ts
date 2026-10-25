@@ -1,5 +1,10 @@
 import { createDatabase, withTx } from '@agentdrop/db';
-import { defaultApprovalPolicy, ensureSystemAssistant, initContentEncryption } from '@agentdrop/domain';
+import {
+  defaultApprovalPolicy,
+  ensureSystemAssistant,
+  feishuAppConfigFromEnv,
+  initContentEncryption,
+} from '@agentdrop/domain';
 import { FsStorage, S3Storage } from '@agentdrop/storage';
 import { buildApp } from './app.js';
 import { createAuth } from './auth.js';
@@ -54,7 +59,17 @@ async function main(): Promise<void> {
   if (!assistant) console.warn('[agentdrop-api] handle @agentdrop belongs to a person; assistant disabled');
   const mailer = createMailer(config);
   const auth = createAuth(config, db, { mailer });
-  const app = await buildApp({ config, db, storage, auth, mailer, approvalPolicy: defaultApprovalPolicy });
+  // the server's own Feishu app (ADR 0039): the API only needs its id, for the bot link; the worker holds the secret
+  const feishuApp = feishuAppConfigFromEnv(process.env, { requireSecret: false });
+  const app = await buildApp({
+    config,
+    db,
+    storage,
+    auth,
+    mailer,
+    approvalPolicy: defaultApprovalPolicy,
+    feishuApp,
+  });
 
   const shutdown = async (signal: string) => {
     app.log.info({ signal }, 'shutting down');

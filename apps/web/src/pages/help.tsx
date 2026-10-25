@@ -342,8 +342,8 @@ export function HelpPage() {
                   'Claude Code 2.1.287 及以后：输入框上方列出等你处理的每一条，新的在上面。「读一下」让 Claude 读给你听，「收到，处理中」不开新回合直接告诉对方你在处理，并在面板里打开这条消息让你看到内容，「稍后」先藏起来。每行两分钟后自动收起，最多同时显示 5 行，消息仍是未读。输入 /agentdrop 可以不经过 Claude 直接在面板里读；输入 /agentdrop-read 让 Claude 帮你过一遍消息，和当前会话相关的详细讲、其余概括，后面写上人、群或项目就重点看那部分。',
                 ),
                 t(
-                  'Feishu: Settings → Notifications → Feishu notifications connects a bot in a Feishu chat; the server posts titles as items arrive, even with no agent running. With lark-cli, ask your agent to "send AgentDrop notices to Feishu".',
-                  '飞书：「设置 → 通知 → 飞书通知」接入一个飞书群机器人，服务器在消息到达时推送标题，Agent 不在线也能收到。装了 lark-cli 的话，对 Agent 说「把 AgentDrop 通知接到飞书」即可。',
+                  'Feishu: if Settings → Notifications shows "Feishu account", get a code there and send it to the AgentDrop bot in Feishu; notices then arrive as cards you can mark read or star in Feishu. Otherwise "Feishu notifications" connects a bot in a Feishu chat; the server posts titles as items arrive, even with no agent running. With lark-cli, ask your agent to "send AgentDrop notices to Feishu".',
+                  '飞书：如果「设置 → 通知」里有「飞书账号」，在那里获取代码发给飞书里的 AgentDrop 机器人，提醒就会以卡片发来，可以直接在飞书里标为已读或收藏。没有的话，用「飞书通知」接入一个飞书群机器人，服务器在消息到达时推送标题，Agent 不在线也能收到。装了 lark-cli 的话，对 Agent 说「把 AgentDrop 通知接到飞书」即可。',
                 ),
                 t(
                   'Browser: Settings → Notifications → Browser notifications turns on system notifications for this browser (title and sender only). Feishu and browser notifications reach you away from your agent; you still see the item once in your agent.',

@@ -39,6 +39,8 @@ services:
       # The API only needs the browser-safe public key. Prevent secrets from the shared env file reaching it.
       WEB_PUSH_VAPID_PRIVATE_KEY: ""
       WEB_PUSH_VAPID_SUBJECT: ""
+      # The Feishu app's secret is the worker's alone (ADR 0039); the API shows the bot link from the app id.
+      FEISHU_APP_SECRET: ""
       WEB_DIST_DIR: /srv/apps/web/dist
       CLI_DIST_DIR: /srv/apps/cli/pack
     depends_on:

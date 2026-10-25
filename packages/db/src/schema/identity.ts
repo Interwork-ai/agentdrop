@@ -100,6 +100,80 @@ export const pushSubscriptions = pgTable(
   ],
 );
 
+/**
+ * A person's Feishu account linked to the server's own Feishu app (ADR 0039): notices arrive as cards in a direct
+ * chat with the app's bot. One per account and one per Feishu user of this app; `open_id` is only meaningful within
+ * `app_id`, so a server that switches apps keeps nothing that would reach the wrong person.
+ */
+export const feishuAccounts = pgTable(
+  'feishu_accounts',
+  {
+    userId: uuid('user_id')
+      .primaryKey()
+      .references(() => appUsers.id, { onDelete: 'cascade' }),
+    appId: text('app_id').notNull(),
+    openId: text('open_id').notNull(),
+    unionId: text('union_id'),
+    tenantKey: text('tenant_key'),
+    /** The language cards are written in: the dashboard's when the person asked for the code. */
+    language: text('language').notNull().default('en'),
+    createdAt: ts('created_at').notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('feishu_accounts_app_open_id_uq').on(t.appId, t.openId)],
+);
+
+/** One-time codes a person sends to the bot to link their account (ADR 0039). Only a hash is kept. */
+export const feishuLinkCodes = pgTable(
+  'feishu_link_codes',
+  {
+    codeHash: text('code_hash').primaryKey(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => appUsers.id, { onDelete: 'cascade' }),
+    language: text('language').notNull().default('en'),
+    expiresAt: ts('expires_at').notNull(),
+    createdAt: ts('created_at').notNull().defaultNow(),
+  },
+  (t) => [index('feishu_link_codes_user_idx').on(t.userId)],
+);
+
+/** Wrong codes per Feishu user, so a code cannot be guessed by trying (five per hour). */
+export const feishuLinkFailures = pgTable(
+  'feishu_link_failures',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    appId: text('app_id').notNull(),
+    openId: text('open_id').notNull(),
+    failedAt: ts('failed_at').notNull().defaultNow(),
+  },
+  (t) => [index('feishu_link_failures_open_id_idx').on(t.appId, t.openId, t.failedAt)],
+);
+
+/**
+ * The card a notice became for one person and drop, so a button press and a read elsewhere can update it. Feishu
+ * lets a card be changed for 14 days; older rows are removed.
+ */
+export const feishuCards = pgTable(
+  'feishu_cards',
+  {
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => appUsers.id, { onDelete: 'cascade' }),
+    dropId: uuid('drop_id').notNull(),
+    /** The receiving agent the dashboard link opens, as for browser push. */
+    hId: uuid('h_id').notNull(),
+    messageId: text('message_id').notNull(),
+    /** What the card shows now; the worker compares it with the person's state. */
+    shownRead: boolean('shown_read').notNull().default(false),
+    shownStarred: boolean('shown_starred').notNull().default(false),
+    createdAt: ts('created_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('feishu_cards_user_drop_uq').on(t.userId, t.dropId),
+    index('feishu_cards_created_idx').on(t.createdAt),
+  ],
+);
+
 /** Logical device = one bridge installation (random installation id), never a hardware fingerprint. */
 export const devices = pgTable(
   'devices',

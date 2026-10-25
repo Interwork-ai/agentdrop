@@ -115,6 +115,9 @@ export async function startApi(server) {
       PAIRING_START_PER_MIN: '500',
       LOG_LEVEL: 'warn',
       WEB_DIST_DIR: join(ROOT, 'apps/web/dist'),
+      // a made-up Feishu app, so Settings offers "Feishu account"; only the API runs here, nothing calls Feishu
+      FEISHU_APP_ID: 'cli_e2etestapp',
+      FEISHU_APP_SECRET: 'e2e-made-up-secret',
     },
     stdio: ['ignore', 'inherit', 'inherit'],
   });
