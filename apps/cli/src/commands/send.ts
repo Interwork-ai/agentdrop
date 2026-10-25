@@ -8,6 +8,7 @@ import {
   type GroupCard,
   LIMITS,
   type PersonCard,
+  type ReplyProgress,
   type SendResult,
   type SendTarget,
   searchKey,
@@ -212,6 +213,11 @@ export function sendErrorText(t: Tr, err: unknown, profile: string, file?: strin
             '无法回复那条消息（你读不到它）；没有发出。',
           );
         if (about('mentions')) return t('Mentions only work in a group message.', '只有群消息才能 @ 成员。');
+        if (/progress/.test(JSON.stringify(issues ?? null)) || /progress/.test(err.message))
+          return t(
+            'This server does not take --progress yet; send it again without --progress. Nothing was sent.',
+            '这台服务器还不支持 --progress，去掉 --progress 再发一次；没有发出。',
+          );
         return t('The server refused this message; nothing was sent.', '服务器拒绝了这条消息；没有发出。');
       }
     }
@@ -342,6 +348,8 @@ export interface SendOptions {
   body?: string;
   files?: string[];
   replyTo?: string;
+  /** With `replyTo`: where the work the answered message asked for stands (ADR 0038). */
+  progress?: ReplyProgress;
   /** Text piped in; defaults to `readPipedStdin()` when no body was given. */
   stdin?: () => string | null | Promise<string | null>;
   retryDelayMs?: number;
@@ -386,6 +394,13 @@ async function send(out: Output, t: Tr, opts: SendOptions): Promise<void> {
   const { client } = clientFor(opts.profile);
   const contactsUrl = `${(profile?.server_url ?? '').replace(/\/+$/, '')}/app/contacts`;
   const recipient = await resolveRecipient(t, client, opts.to, contactsUrl);
+  if (opts.progress && !opts.replyTo)
+    throw new SpaceRefusal(
+      t(
+        '--progress says where the work a message asked for stands: give that message with --reply-to.',
+        '--progress 表示对方请求的事进展到哪一步，需要用 --reply-to 指明是哪条消息。',
+      ),
+    );
   const reply_to = opts.replyTo ? await resolveDropId(client, opts.replyTo) : undefined;
   const allowedDirs = profile?.allowed_dirs ?? [];
   const explain = (err: unknown, file: string) => sendErrorText(t, err, opts.profile, file);
@@ -414,6 +429,7 @@ async function send(out: Output, t: Tr, opts: SendOptions): Promise<void> {
       attachment_ids: uploaded.map((u) => u.attachment_id),
       extensions: {},
       ...(reply_to ? { reply_to } : {}),
+      ...(reply_to && opts.progress ? { progress: opts.progress } : {}),
     },
   };
   const res = await sendWithRetry(client, input, {

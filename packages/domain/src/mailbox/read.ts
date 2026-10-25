@@ -809,6 +809,7 @@ function summary(
     ...(presentation.recipientStatus ? { recipient_status: presentation.recipientStatus } : {}),
     reply_to: presentation.replyTo,
     ...(presentation.replies ? { replies: presentation.replies } : {}),
+    ...(d.progress ? { progress: d.progress } : {}),
   };
 }
 
@@ -862,6 +863,7 @@ async function repliesForDrops(
             replyTo: drops.replyToDropId,
             authorUserId: drops.authorUserId,
             createdAt: drops.createdAt,
+            progress: drops.progress,
           })
           .from(drops)
           .where(and(inArray(drops.replyToDropId, authored), readableThrough(visibleHIds, viewer)))
@@ -884,7 +886,13 @@ async function repliesForDrops(
     for (const r of mine) {
       const u = userById.get(r.authorUserId);
       if (!u || authors.some((a) => a.handle === u.handle)) continue;
-      authors.push({ handle: u.handle, display_label: remarks.get(u.id) ?? u.displayName ?? `@${u.handle}` });
+      // newest first, so the first reply of theirs that says where the work stands is the latest word (ADR 0038)
+      const progress = mine.find((m) => m.authorUserId === r.authorUserId && m.progress)?.progress;
+      authors.push({
+        handle: u.handle,
+        display_label: remarks.get(u.id) ?? u.displayName ?? `@${u.handle}`,
+        ...(progress ? { progress } : {}),
+      });
     }
     result.set(id, {
       count: mine.length,

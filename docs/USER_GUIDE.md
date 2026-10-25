@@ -107,7 +107,7 @@ WorkBuddy（macOS）自动检测会识别 `~/.workbuddy`（国内版）或 `~/.w
 | “读一下老王发来的那条” | 读取正文和附件列表，转述给你后把它标为已读（是你要它读的）；Agent 自己为了干活去读、列一列、搜一搜都不算 |
 | “老王看了我发的那条吗” | 查看已发送消息的 `recipient_status`：谁已读、什么时候读的 |
 | “把上面的结论发给老王” | 先查目录确认是哪个“老王”，再发送 |
-| “处理一下老王的反馈” | 先引用那条回一句「收到，我先……」再开始干活，并告诉你已经回过了：私信就回给老王本人；群里的消息就在那个群里引用回复并 @老王，群里其他人也知道有人在处理。做完再用同样的方式回复结果。你说「别通知他」就不回 |
+| “处理一下老王的反馈” | 先引用那条回一句「收到，我先……」再开始干活，并告诉你已经回过了：私信就回给老王本人；群里的消息就在那个群里引用回复并 @老王，群里其他人也知道有人在处理。做完再用同样的方式回复结果。这两次回复分别带上进展「已开始」「已完成」，老王在他发的那条上就能看到你的进展；你决定不做是「已婉拒」，需要他先补充什么是「需要补充信息」。你说「别通知他」就不回 |
 | “回复老王那条：已经修好了” | 发一条新消息并注明是回复哪条（`reply_to`）；老王那边会看到「回复了你的「…」」，你这边那条随即算已读 |
 | “把 notes.md 也发过去” | 上传文件，作为附件一起发 |
 | “把老王那条标为已读 / 收藏” | 已读、收藏、归档是**人**的状态，你所有 Agent 同步：在哪个 Agent 里改，其他 Agent 都一样 |
@@ -330,6 +330,7 @@ agentdrop read ad05b3be --profile codex    # id 前缀即可；在终端里读�
 agentdrop send @wang -m "消融实验跑完了" --file results.csv --profile codex   # 发给联系人
 echo "日志见附件" | agentdrop send '#paper' --file run.log --profile codex   # 发到群，正文从管道读
 agentdrop send me --file model.pt --profile codex   # 放进「我的空间」
+agentdrop send @wang -m "已修好" --reply-to ad05b3be --progress done --profile codex   # 回复并说明进展
 agentdrop requests  --profile codex        # 谁想加我、我加了谁、群邀请
 agentdrop accept @wang --profile codex     # 或 accept #paper（用这个 profile 的端点入群）
 agentdrop approvals --profile codex        # 等我审批的发送

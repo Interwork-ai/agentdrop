@@ -10,7 +10,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { mergeNoticeState } from '@agentdrop/contracts';
+import { mergeNoticeState, type ReplyProgress, replyProgressSchema } from '@agentdrop/contracts';
 import type { PendingSummary } from './commands/pending.js';
 import type { NotificationSettings } from './hook-settings.js';
 import type { Language } from './locale.js';
@@ -462,6 +462,27 @@ function hookMessage(content: string | null | undefined, language: Language = 'e
   return content ? capNotice(content, language) : null;
 }
 
+/** What a reply did to the drop it answers, for people (ADR 0038); the same verbs as Feishu and browser push. */
+const REPLY_EN: Record<ReplyProgress | 'none', string> = {
+  none: 'replied to',
+  started: 'started on',
+  done: 'finished',
+  declined: 'declined',
+  needs_info: 'needs more information for',
+};
+const REPLY_ZH: Record<ReplyProgress | 'none', string> = {
+  none: '回复了',
+  started: '开始处理',
+  done: '完成了',
+  declined: '婉拒了',
+  needs_info: '需要补充信息才能处理',
+};
+/** A value a newer server may add reads as a plain reply. */
+const progressOf = (value: unknown): ReplyProgress | null => {
+  const parsed = replyProgressSchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
+};
+
 /** Everything the renderer says, per audience and language; the items and their order are shared. */
 interface Strings {
   title: string;
@@ -477,6 +498,8 @@ interface Strings {
     mentioned: boolean,
     /** Title of the drop it answers, when the person may read it. */
     replyTo: string | null,
+    /** What the reply says about the answered drop's work (ADR 0038); null for a plain reply. */
+    progress: ReplyProgress | null,
   ) => string;
   direct: string;
   /** `label` is `#slug` or `"name" #slug`; empty when an older server did not name the group. */
@@ -504,8 +527,8 @@ const HUMAN: Record<Language, Strings> = {
     title: 'AgentDrop: new',
     unread: (n) => `New messages: ${n}`,
     unreadAtLeast: (n) => `New messages: at least ${n}`,
-    drop: (_id, sender, title, a, m, r) =>
-      `- ${sender}${m ? ' mentioned you' : ''}${r ? ` replied to "${r}"` : ''} · "${title}"${a ? ` · ${a} attachment${a > 1 ? 's' : ''}` : ''}`,
+    drop: (_id, sender, title, a, m, r, p) =>
+      `- ${sender}${m ? ' mentioned you' : ''}${r ? ` ${REPLY_EN[p ?? 'none']} "${r}"` : ''} · "${title}"${a ? ` · ${a} attachment${a > 1 ? 's' : ''}` : ''}`,
     direct: 'Direct messages:',
     group: (label) => (label ? `In group ${label}:` : 'Group messages:'),
     groupLabel: (name, slug) => `“${name}” #${slug}`,
@@ -527,8 +550,8 @@ const HUMAN: Record<Language, Strings> = {
     title: 'AgentDrop 新通知',
     unread: (n) => `新消息：${n} 条`,
     unreadAtLeast: (n) => `新消息：至少 ${n} 条`,
-    drop: (_id, sender, title, a, m, r) =>
-      `- ${sender}${m ? ' @了你' : ''}${r ? ` 回复了「${r}」·` : ' ·'}「${title}」${a ? ` · ${a} 个附件` : ''}`,
+    drop: (_id, sender, title, a, m, r, p) =>
+      `- ${sender}${m ? ' @了你' : ''}${r ? ` ${REPLY_ZH[p ?? 'none']}「${r}」·` : ' ·'}「${title}」${a ? ` · ${a} 个附件` : ''}`,
     direct: '私信：',
     group: (label) => (label ? `群 ${label}：` : '群消息：'),
     groupLabel: (name, slug) => `「${name}」#${slug}`,
@@ -553,8 +576,8 @@ const MODEL: Strings = {
   title: 'AgentDrop pending items',
   unread: (n) => `Unread drops: ${n}`,
   unreadAtLeast: (n) => `Unread drops: at least ${n}`,
-  drop: (id, sender, title, a, m, r) =>
-    `- drop_id=${id} ${sender}${m ? ' (mentions the user)' : ''}${r ? ` (replies to "${r}")` : ''} · "${title}"${a ? ` · ${a} attachment${a > 1 ? 's' : ''}` : ''}`,
+  drop: (id, sender, title, a, m, r, p) =>
+    `- drop_id=${id} ${sender}${m ? ' (mentions the user)' : ''}${r ? ` (replies to "${r}"${p ? `; progress: ${p}` : ''})` : ''} · "${title}"${a ? ` · ${a} attachment${a > 1 ? 's' : ''}` : ''}`,
   direct: 'Direct (sent to the user personally):',
   group: (label) => (label ? `Group ${label}:` : 'Group drops:'),
   // Whatever does not fit is not listed; every overflow line says where the rest is, so nothing looks like the whole set.
@@ -698,6 +721,7 @@ function renderPending(
               drop.attachment_count,
               drop.mentioned_me === true,
               drop.reply_to_title ? cleanExternal(drop.reply_to_title, 60) || t.untitled : null,
+              (drop.reply_to_title && progressOf(drop.reply_progress)) || null,
             ),
             isNewDrop(drop),
             t,

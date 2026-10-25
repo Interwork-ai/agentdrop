@@ -35,7 +35,12 @@ type Summary = {
   state_version: number;
   deliveries: Array<{ h_id: string; read: boolean; state_version: number }>;
   reply_to?: { drop_id: string; title: string; mine?: boolean } | null;
-  replies?: { count: number; latest_at: string | null; authors?: Array<{ handle: string }> };
+  replies?: {
+    count: number;
+    latest_at: string | null;
+    authors?: Array<{ handle: string; progress?: string }>;
+  };
+  progress?: string;
 };
 
 describeDb(
@@ -393,6 +398,67 @@ describeDb(
       const replay = await sendRaw(bobA, toUser(alice), 'answer', { reply_to: q }, requestId);
       expect(replay.json().drop_id).toBe(first.json().drop_id);
       expect((await find(bobA, q)).read).toBe(false);
+    });
+
+    it('a reply says where the asked-for work stands; the asker sees each person’s latest word (ADR 0038)', async () => {
+      const ask = await send(aliceH, toUser(bob), 'Clean the dataset');
+      // progress means nothing without the drop it answers: refused, nothing sent
+      const alone = await sendRaw(bobA, toUser(alice), 'done', { progress: 'done' });
+      expect(alone.statusCode, alone.body).toBe(400);
+      expect(alone.json()).toMatchObject({ code: 'VALIDATION_FAILED', details: { field: 'progress' } });
+      const bogus = await sendRaw(bobA, toUser(alice), 'done', { reply_to: ask, progress: 'paused' });
+      expect(bogus.statusCode, bogus.body).toBe(400);
+
+      const started = await send(bobA, toUser(alice), 'On it', { reply_to: ask, progress: 'started' });
+      expect((await find(aliceH, started)).progress).toBe('started');
+      expect((await read(aliceH, started)).drop.progress).toBe('started');
+      expect((await find(aliceH, ask, '?view=sent')).replies?.authors).toEqual([
+        expect.objectContaining({ handle: 'bob', progress: 'started' }),
+      ]);
+      // a later note without progress keeps the last word; a later progress replaces it
+      await send(bobB, toUser(alice), 'Quick question', { reply_to: ask });
+      expect((await find(aliceH, ask, '?view=sent')).replies?.authors?.[0]?.progress).toBe('started');
+      const done = await send(bobB, toUser(alice), 'Done', { reply_to: ask, progress: 'done' });
+      expect((await read(aliceH, ask)).drop.replies).toMatchObject({
+        count: 3,
+        authors: [{ handle: 'bob', progress: 'done' }],
+      });
+      // an ordinary drop carries none
+      expect((await find(aliceH, ask, '?view=sent')).progress).toBeUndefined();
+      // a person who may not read the replies sees none of their progress: carol never got them
+      const forwarded = await send(aliceH, toUser(carol), 'FYI', { reply_to: ask });
+      expect((await read(carolH, forwarded)).drop.reply_to).toBeNull();
+      // bob's own sent reply shows what he said
+      expect((await find(bobA, done, '?view=sent')).progress).toBe('done');
+    });
+
+    it('progress is part of idempotency content', async () => {
+      const ask = await send(aliceH, toUser(bob), 'Review the draft');
+      const requestId = `req-${randomUUID()}`;
+      const first = await sendRaw(
+        bobA,
+        toUser(alice),
+        'Re',
+        { reply_to: ask, progress: 'started' },
+        requestId,
+      );
+      expect(first.statusCode, first.body).toBe(200);
+      const same = await sendRaw(
+        bobA,
+        toUser(alice),
+        'Re',
+        { reply_to: ask, progress: 'started' },
+        requestId,
+      );
+      expect(same.json().drop_id).toBe(first.json().drop_id);
+      const changed = await sendRaw(
+        bobA,
+        toUser(alice),
+        'Re',
+        { reply_to: ask, progress: 'done' },
+        requestId,
+      );
+      expect(changed.json().code).toBe('IDEMPOTENCY_CONFLICT');
     });
 
     it('reading a reply marks nothing read', async () => {

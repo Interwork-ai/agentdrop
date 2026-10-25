@@ -145,6 +145,7 @@ export function createHandlers(deps: HandlerDeps): Record<string, Handler> {
               group: r.group,
               mentioned: r.mentioned,
               replyTo: r.replyTo ?? null,
+              progress: r.replyTo ? (audience?.progress ?? null) : null,
               fromHandle: audience?.sender.handle ?? '',
               title: audience?.title ?? '',
               link: link(`/app/inbox/${encodeURIComponent(dropId)}?h=${encodeURIComponent(r.hId)}`),

@@ -287,6 +287,7 @@ export async function commitDrop(
       hashVersion: hash.version,
       expiresAt,
       replyToDropId: envelope.payload.reply_to ?? null,
+      progress: envelope.payload.progress ?? null,
     })
     .returning();
   if (!drop) throw new AgentDropError('INTERNAL', 'drop insert failed');
@@ -392,6 +393,15 @@ export async function commitDrop(
  */
 export async function assertReplyTarget(tx: Tx, scope: MailboxScope, envelope: SendEnvelope): Promise<void> {
   const replyTo = envelope.payload.reply_to;
+  // progress says where the answered drop's work stands (ADR 0038): it means nothing without the drop it answers
+  if (envelope.payload.progress && !replyTo)
+    throw new AgentDropError(
+      'VALIDATION_FAILED',
+      'progress needs reply_to: it says where an answered drop stands',
+      {
+        field: 'progress',
+      },
+    );
   if (!replyTo) return;
   try {
     await loadAuthorizedDrop(tx, scope, replyTo);

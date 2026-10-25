@@ -1,5 +1,5 @@
-import { harnessKeySchema } from '@agentdrop/contracts';
-import { Command } from 'commander';
+import { harnessKeySchema, type ReplyProgress } from '@agentdrop/contracts';
+import { Command, Option } from 'commander';
 import { maybeStartTakeWorker, takeClaudeMod } from './claude-mod.js';
 import { synchronizeClientSettings } from './client-preferences.js';
 import { accountRecoverCommand } from './commands/account.js';
@@ -383,11 +383,24 @@ export function buildProgram(): Command {
     .option('-m, --body <text>', 'the text (default: what is piped in)')
     .option('--file <paths...>', 'files to attach, up to 10 (same folders as upload_file: see allow-dir)')
     .option('--reply-to <drop_id>', 'the message this answers (id or id prefix)')
+    .addOption(
+      new Option(
+        '--progress <state>',
+        'with --reply-to: where the work that message asked for stands',
+      ).choices(['started', 'done', 'declined', 'needs_info']),
+    )
     .requiredOption('--profile <name>')
     .action(
       async (
         to: string,
-        o: { title?: string; body?: string; file?: string[]; replyTo?: string; profile: string },
+        o: {
+          title?: string;
+          body?: string;
+          file?: string[];
+          replyTo?: string;
+          progress?: ReplyProgress;
+          profile: string;
+        },
       ) =>
         sendCommand(out(), {
           profile: o.profile,
@@ -396,6 +409,7 @@ export function buildProgram(): Command {
           ...(o.body !== undefined ? { body: o.body } : {}),
           ...(o.file ? { files: o.file } : {}),
           ...(o.replyTo ? { replyTo: o.replyTo } : {}),
+          ...(o.progress ? { progress: o.progress } : {}),
         }),
     );
   program

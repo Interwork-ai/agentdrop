@@ -42,7 +42,7 @@ import {
 } from '../lib/format.js';
 import { type Lang, type Translate, useLang, useT } from '../lib/lang.js';
 import { isAssistant, personName } from '../lib/people.js';
-import { replyHref, replyRecipient } from '../lib/reply.js';
+import { progressLabel, progressTone, replyHref, replyRecipient } from '../lib/reply.js';
 import { mailboxKey, useFocusAwareInterval, useSession } from '../lib/session.js';
 import { AttachmentTile } from '../ui/attachment-tile.jsx';
 import {
@@ -647,6 +647,7 @@ function DropRow({
           <span className={`min-w-0 flex-1 truncate text-sm ${unread ? 'text-fg' : 'text-fg-2'}`}>
             {d.title}
           </span>
+          {d.reply_to ? <ProgressChip progress={d.progress} t={t} /> : null}
           {d.starred ? (
             <Star size={13} aria-label={t('Starred', '已收藏')} className="shrink-0 fill-warn text-warn" />
           ) : null}
@@ -683,13 +684,32 @@ function DropRow({
   );
 }
 
-/** "2 replies from Wang @wang, Li @li": a count always comes with who (docs/PRODUCT_PRINCIPLES.md #4). */
+/**
+ * "2 replies from Wang @wang (Done), Li @li": a count always comes with who (docs/PRODUCT_PRINCIPLES.md #4), and
+ * each person with the latest progress their replies give (ADR 0038).
+ */
 function repliesText(replies: NonNullable<DropSummary['replies']>, t: Translate): string {
-  const who = (replies.authors ?? []).map((a) => `${a.display_label} @${a.handle}`).join(t(', ', '、'));
+  const who = (replies.authors ?? [])
+    .map((a) => {
+      const progress = progressLabel(a.progress, t);
+      return `${a.display_label} @${a.handle}${progress ? t(` (${progress})`, `（${progress}）`) : ''}`;
+    })
+    .join(t(', ', '、'));
   const n = replies.count;
   return who
     ? t(`${plural(n, 'reply', 'replies')} from ${who}`, `${n} 条回复，来自 ${who}`)
     : t(plural(n, 'reply', 'replies'), `${n} 条回复`);
+}
+
+/** A reply's progress as a small chip (ADR 0038); nothing for a plain reply or a value this dashboard does not know. */
+function ProgressChip({ progress, t }: { progress: string | undefined; t: Translate }) {
+  const label = progressLabel(progress, t);
+  if (!label) return null;
+  return (
+    <span className="shrink-0">
+      <Chip tone={progressTone(progress)}>{label}</Chip>
+    </span>
+  );
 }
 
 /** Who a drop I sent went to: "@wang", "#paper", "@wang, @lili". */
@@ -1024,6 +1044,7 @@ function DropDetailPane({ hId, dropId, view }: { hId: string; dropId: string; vi
                   {t(`“${d.reply_to.title}”`, `「${d.reply_to.title}」`)}
                 </span>
               </Link>
+              <ProgressChip progress={d.progress} t={t} />
             </p>
           ) : null}
           <h2 className="untrusted text-balance text-lg font-semibold text-fg">{d.title}</h2>

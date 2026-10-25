@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import type { ApiClient } from '@agentdrop/client';
-import { type DropSummary, LIMITS } from '@agentdrop/contracts';
+import { type DropSummary, LIMITS, type ReplyProgress } from '@agentdrop/contracts';
 import { readEffectiveHookSettings } from '../client-preferences.js';
 import { dropNoticeSource } from '../drop-notice-source.js';
 import { type Language, readLanguage } from '../locale.js';
@@ -39,6 +39,8 @@ export interface BandDrop {
   reply_to_title: string | null;
   /** Whether the drop it answers is the person's own; null when the server does not say (before 0.5.9). */
   reply_to_mine: boolean | null;
+  /** What the reply says about the answered drop's work (ADR 0038); null for a plain reply or an older server. */
+  reply_progress: ReplyProgress | null;
   attachments: number;
   created_at: string;
   /** When it reached the person; the band sorts by this, as the dashboard does. */
@@ -253,6 +255,7 @@ async function fetchBand(profileName: string, now: number): Promise<BandData> {
         mentioned,
         reply_to_title: replyTitle,
         reply_to_mine: replyTitle ? mine : null,
+        reply_progress: (replyTitle && d.progress) || null,
         attachments: d.attachment_count,
         created_at: d.created_at,
         received_at: d.received_at,
@@ -442,6 +445,12 @@ function isMentionRefusal(err: unknown): boolean {
   return e?.code === 'VALIDATION_FAILED' && e.details?.field === 'mentions';
 }
 
+/** An older server's strict payload names the unknown `progress` key in its validation details. */
+function isProgressRefusal(err: unknown): boolean {
+  const e = err as { code?: unknown; details?: unknown } | null;
+  return e?.code === 'VALIDATION_FAILED' && JSON.stringify(e.details ?? null).includes('progress');
+}
+
 function isIdempotencyConflict(err: unknown): boolean {
   return (err as { code?: unknown } | null)?.code === 'IDEMPOTENCY_CONFLICT';
 }
@@ -473,7 +482,7 @@ export async function ackCommand(
     /^re:\s*/i.test(drop.title) ? drop.title : `Re: ${drop.title}`,
     LIMITS.TITLE_MAX_CHARS,
   );
-  const send = (requestId: string, mention: boolean) =>
+  const send = (requestId: string, mention: boolean, progress: boolean) =>
     client.sendDrop({
       // the body is in the person's language: a press in the other language is another reply, not a conflict
       request_id: requestId,
@@ -488,14 +497,25 @@ export async function ackCommand(
         attachment_ids: [],
         extensions: {},
         reply_to: dropId,
+        // the person took it on (ADR 0038)
+        ...(progress ? { progress: 'started' as const } : {}),
         ...(mention ? { mentions: [drop.author.handle] } : {}),
       },
     });
+  /** A server before ADR 0038 refuses `progress` before saving anything: the same request goes again without it. */
+  const sendWithProgress = async (requestId: string, mention: boolean) => {
+    try {
+      return await send(requestId, mention, true);
+    } catch (err) {
+      if (!isProgressRefusal(err)) throw err;
+      return await send(requestId, mention, false);
+    }
+  };
   const requestId = `ack:${dropId}:${language}`;
   /** null: this acknowledgement was already sent with other content. */
   const sendOnce = async (id: string, mention: boolean) => {
     try {
-      return await send(id, mention);
+      return await sendWithProgress(id, mention);
     } catch (err) {
       if (isIdempotencyConflict(err)) return null;
       throw err;

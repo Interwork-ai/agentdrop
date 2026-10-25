@@ -1,3 +1,4 @@
+import type { ReplyProgress } from '@agentdrop/contracts';
 import {
   appUsers,
   type DrizzleDb,
@@ -60,6 +61,8 @@ export interface EligibleRecipient {
 export interface DropNotificationAudience {
   sender: { handle: string; displayName: string };
   title: string;
+  /** Where the answered drop's work stands, when this drop is a reply that says so (ADR 0038). */
+  progress: ReplyProgress | null;
   recipients: EligibleRecipient[];
 }
 
@@ -163,6 +166,7 @@ export async function resolveDropNotificationAudience(
   const activeIds = new Set(activeUsers.map((user) => user.id));
   return {
     title: openDropForList(drop).title,
+    progress: drop.progress,
     sender: {
       handle: typeof authorSnapshot.handle === 'string' ? authorSnapshot.handle : author.handle,
       displayName:
@@ -262,6 +266,8 @@ export async function sendDropWebPush(
         // set only when this person may read the drop it answers: the notice then says it is a reply
         reply_to_title: recipient.replyTo?.title ?? null,
         reply_to_mine: recipient.replyTo?.mine ?? false,
+        // what the reply says about the answered drop's work (ADR 0038); only with reply_to_title
+        reply_progress: recipient.replyTo ? audience.progress : null,
         title: audience.title,
         url: `/app/inbox/${encodeURIComponent(dropId)}?h=${encodeURIComponent(recipient.hId)}`,
       },

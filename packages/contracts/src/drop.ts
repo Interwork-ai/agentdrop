@@ -5,6 +5,12 @@ import { publicEmailFieldSchema, resultHarnessKeySchema } from './names.js';
 export const dropKindSchema = z.enum(['text', 'context', 'file']);
 export type DropKind = z.infer<typeof dropKindSchema>;
 
+/**
+ * Where the work asked for in the answered drop stands, from the replying person's side (ADR 0038). Only on a reply.
+ */
+export const replyProgressSchema = z.enum(['started', 'done', 'declined', 'needs_info']);
+export type ReplyProgress = z.infer<typeof replyProgressSchema>;
+
 export const uuidSchema = z.uuid();
 export const attachmentIdSchema = uuidSchema;
 export const dropIdSchema = uuidSchema;
@@ -58,6 +64,13 @@ export const dropPayloadV1Schema = z
      * for the sender (ADR 0016).
      */
     reply_to: dropIdSchema.optional(),
+    /**
+     * With `reply_to` only (VALIDATION_FAILED `progress` otherwise, nothing sent): where the work the answered drop
+     * asked for stands now, from the replying person's side: `started`, `done`, `declined`, or `needs_info` (the
+     * body says what is needed). Omit it for a reply to a drop that asked for nothing. Part of the content, so part
+     * of idempotency.
+     */
+    progress: replyProgressSchema.optional(),
   })
   .strict();
 export type DropPayloadV1 = z.infer<typeof dropPayloadV1Schema>;
@@ -263,7 +276,16 @@ export type ReplyRef = z.infer<typeof replyRefSchema>;
 export const repliesInfoSchema = z.object({
   count: z.number().int().nonnegative(),
   latest_at: z.iso.datetime().nullable(),
-  authors: z.array(z.object({ handle: z.string(), display_label: z.string() })).optional(),
+  authors: z
+    .array(
+      z.object({
+        handle: z.string(),
+        display_label: z.string(),
+        /** The latest progress this person's readable replies give (ADR 0038); absent when none gives one. */
+        progress: replyProgressSchema.optional(),
+      }),
+    )
+    .optional(),
 });
 export type RepliesInfo = z.infer<typeof repliesInfoSchema>;
 
@@ -311,6 +333,8 @@ export const dropSummarySchema = z.object({
   reply_to: replyRefSchema.nullable().optional(),
   /** Only on drops the viewer sent: readable replies to it. Absent on drops the viewer did not send. */
   replies: repliesInfoSchema.optional(),
+  /** On a reply that says where the asked-for work stands (payload.progress, ADR 0038); absent otherwise. */
+  progress: replyProgressSchema.optional(),
 });
 export type DropSummary = z.infer<typeof dropSummarySchema>;
 

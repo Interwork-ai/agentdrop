@@ -17,7 +17,7 @@ import { humanError } from '../lib/error-text.js';
 import { formatBytes, plural } from '../lib/format.js';
 import { type Translate, t as tNow, useT } from '../lib/lang.js';
 import { isAssistant, personName } from '../lib/people.js';
-import { replyTitle } from '../lib/reply.js';
+import { progressLabel, REPLY_PROGRESS, type ReplyProgress, replyTitle } from '../lib/reply.js';
 import { mailboxKey, useSession } from '../lib/session.js';
 import { useCombobox } from '../ui/combobox.js';
 import { Avatar, Chip, IconButton, MetaList, PageToolbar, Panel } from '../ui/layout.jsx';
@@ -122,6 +122,8 @@ export function ComposePage() {
   const sourceApplied = useRef<string | null>(null);
   /** A reply names the drop it answers (payload.reply_to) until the person removes that reference. */
   const [replyDropped, setReplyDropped] = useState(false);
+  /** Where the work the answered drop asked for stands (ADR 0038); empty for a plain reply. */
+  const [progress, setProgress] = useState<ReplyProgress | ''>('');
   const replyTo = replyId && !replyDropped ? replyId : null;
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -299,6 +301,7 @@ export function ComposePage() {
         files: files.map((f) => f.attachment_id),
         mentions: activeMentions,
         replyTo,
+        progress: replyTo ? progress : '',
       });
       if (submittedDraft.current !== null && submittedDraft.current !== draft)
         requestId.current = newRequestId();
@@ -315,6 +318,7 @@ export function ComposePage() {
           extensions: {},
           ...(activeMentions.length ? { mentions: activeMentions } : {}),
           ...(replyTo ? { reply_to: replyTo } : {}),
+          ...(replyTo && progress ? { progress } : {}),
         },
       });
     },
@@ -564,6 +568,21 @@ export function ComposePage() {
                       '对方会看到这是在回复哪条消息。发送后，那条消息也会对你标为已读。',
                     )}
                   </p>
+                  <label className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted">
+                    {t('Where it stands', '进展')}
+                    <select
+                      className="h-8 rounded-lg border border-line-strong bg-surface-2 px-2 text-sm text-fg outline-none focus:border-accent/60"
+                      value={progress}
+                      onChange={(e) => setProgress(e.target.value as ReplyProgress | '')}
+                    >
+                      <option value="">{t('Just a reply', '只是回复')}</option>
+                      {REPLY_PROGRESS.map((p) => (
+                        <option key={p} value={p}>
+                          {progressLabel(p, t)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
                 </>
               ) : null}
             </div>

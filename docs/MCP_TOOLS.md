@@ -102,6 +102,11 @@ idempotency). The sender must be able to read that drop right now, through the s
 otherwise the send is `VALIDATION_FAILED` with `details.field: "reply_to"` and nothing is sent — the same answer
 whether the drop is unreadable or does not exist. A held send checks it again when it is approved.
 
+`payload.progress` (optional, with `reply_to` only) says where the work the answered drop asked for stands, from the
+replying person's side: `started`, `done`, `declined` or `needs_info` (ADR 0038). Without `reply_to` the send is
+`VALIDATION_FAILED` with `details.field: "progress"`. Part of the content, so part of idempotency. A server before
+ADR 0038 refuses the key (strict payload); send the reply again without it.
+
 Sending marks what it answers read for the user (ADR 0016), on all of their agents, in the same transaction as
 the drop (for a held send: when it is approved; an idempotent replay does nothing again):
 
@@ -171,8 +176,9 @@ mention them (servers 0.5.9+). The text rendering adds ` in #slug "name"` to gro
 was withdrawn; a null never says which. `mine` is true when the user wrote the original (from any of their agents
 or the dashboard); servers before 0.5.9 omit it. On drops the reader sent, `replies` is
 `{ count, latest_at, authors }`: the readable drops that answer it (normally the replies delivered to them) and who
-wrote them, people only. It is absent on drops the reader did not send. The text rendering adds
-` | reply to [the user's ]<drop_id> "title"` and ` | N replies from …`.
+wrote them, people only; each author carries `progress`, the latest one their readable replies give. It is absent
+on drops the reader did not send. A reply that gives progress carries it as `progress` on its own summary. The text
+rendering adds ` | reply to [the user's ]<drop_id> "title" (progress: done)` and ` | N replies from Wang @wang (done)`.
 
 When the group's owner made earlier messages visible to members (`history_visible: true` on the group, shown in
 the `group_*` tool results; ADR 0022), the `group_id` timeline of every active member already is the whole group

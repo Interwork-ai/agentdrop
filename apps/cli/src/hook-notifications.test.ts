@@ -646,6 +646,33 @@ describe('direct and group messages are told apart', () => {
     );
   });
 
+  it('names the progress a reply gives: for people in their language, for the model as a field (ADR 0038)', () => {
+    const replies: PendingSummary = {
+      ...empty,
+      unread: 2,
+      unread_drops: [
+        {
+          ...drop('5', 'wang', 'Re: Ablation results', null),
+          reply_to_title: 'Ablation results, run 14',
+          reply_progress: 'done',
+        },
+        // a value a newer server may add reads as a plain reply
+        { ...drop('6', 'mia', 'Re: Plan', null), reply_to_title: 'Plan', reply_progress: 'paused' },
+      ],
+    };
+    expect(notificationText(replies, 'counts', 'en')).toContain(
+      '- @wang finished "Ablation results, run 14" · "Re: Ablation results"',
+    );
+    expect(notificationText(replies, 'counts', 'zh')).toContain(
+      '- @wang 完成了「Ablation results, run 14」·「Re: Ablation results」',
+    );
+    expect(notificationText(replies, 'counts', 'en')).toContain('- @mia replied to "Plan" · "Re: Plan"');
+    expect(pendingContextText(replies) ?? '').toContain(
+      '@wang (replies to "Ablation results, run 14"; progress: done) · "Re: Ablation results"',
+    );
+    expect(pendingContextText(replies) ?? '').toContain('@mia (replies to "Plan") · "Re: Plan"');
+  });
+
   it('fits the status bar in one line: counts, up to three names, muted groups left out', () => {
     const line: PendingSummary = {
       ...empty,

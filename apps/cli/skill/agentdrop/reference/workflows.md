@@ -59,7 +59,7 @@ send_drop {
   "targets": [{"type": "user", "user_id": "7841…"}],          # or the group it came through
   "payload": {"payload_version": 1, "kind": "text", "title": "Re: 训练不稳定排查结论",
               "body": "梯度累积确认是原因，修复见 commit 3f2a1c9。", "attachment_ids": [], "extensions": {},
-              "reply_to": "5e1a…"}
+              "reply_to": "5e1a…", "progress": "done"}
 }
 ```
 
@@ -72,13 +72,15 @@ send_drop {
   "targets": [{"type": "group", "group_id": "…"}],             # the group it came through (direct: {"type":"user",…})
   "payload": {"payload_version": 1, "kind": "text", "title": "Re: 训练不稳定排查结论",
               "body": "收到，我先复现梯度累积的问题，今天给你结果。", "attachment_ids": [], "extensions": {},
-              "reply_to": "5e1a…", "mentions": ["wang"]}
+              "reply_to": "5e1a…", "progress": "started", "mentions": ["wang"]}
 }
 ```
 
 `reply_to` must be a drop the user may read (otherwise VALIDATION_FAILED `reply_to`, nothing sent). The recipient sees
 which drop it answers; the answered drop becomes read for the user. Posting to a group also marks that group's
-earlier drops read for the user. On the user's sent drops, `replies` counts the answers and names who sent them.
+earlier drops read for the user. On the user's sent drops, `replies` counts the answers and names who sent them,
+each with the latest `progress` they gave. `progress` (`started`, `done`, `declined`, `needs_info`) goes only with
+`reply_to`, and only on replies to drops that asked for something.
 
 ## 3. Send to a group
 

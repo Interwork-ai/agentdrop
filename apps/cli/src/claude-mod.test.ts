@@ -775,6 +775,20 @@ describe("the mod's rows", async () => {
     ]);
   });
 
+  it('names the progress a reply gives, in both languages; an unknown value reads as a plain reply (ADR 0038)', () => {
+    const withProgress = (language: 'en' | 'zh', progress: string) => {
+      const d = data(language);
+      (d.drops[0] as Record<string, unknown>).reply_progress = progress;
+      return rows.buildRows(d, new Set()).rows[0]?.text;
+    };
+    expect(withProgress('en', 'done')).toBe('Wang finished your "Ablation, run 14"');
+    expect(withProgress('zh', 'done')).toBe('Wang 完成了你的「Ablation, run 14」');
+    expect(withProgress('en', 'needs_info')).toBe('Wang needs more information for your "Ablation, run 14"');
+    expect(withProgress('zh', 'started')).toBe('Wang 开始处理你的「Ablation, run 14」');
+    for (const odd of ['paused', 'constructor', '__proto__'])
+      expect(withProgress('en', odd)).toBe('Wang replied to your "Ablation, run 14"');
+  });
+
   it('never puts text written by someone else into a prompt submitted as the person', () => {
     const hostile = data('en');
     const d = hostile.drops[0] as (typeof hostile.drops)[number];

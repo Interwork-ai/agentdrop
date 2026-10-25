@@ -46,6 +46,8 @@ export interface PendingSummary {
     muted?: boolean;
     /** Title of the drop this one answers, when the person may read it (payload.reply_to); null or absent otherwise. */
     reply_to_title?: string | null;
+    /** What the reply says about the answered drop's work (ADR 0038); absent for a plain reply or an older server. */
+    reply_progress?: string | null;
   }>;
   /**
    * Set only on the "new since the last notice" view (`onlyNew`): every fetched drop was new and the server holds
@@ -131,6 +133,7 @@ export async function fetchPending(
           mentioned_me: drop.mentioned_me === true,
           muted: drop.muted === true,
           reply_to_title: drop.reply_to?.title ?? null,
+          reply_progress: drop.reply_to ? (drop.progress ?? null) : null,
           title: drop.title,
           author: { handle: drop.author.handle, display_label: drop.author.display_label },
           attachment_count: drop.attachment_count,

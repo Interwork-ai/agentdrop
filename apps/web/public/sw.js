@@ -74,6 +74,15 @@ function groupLabel(zh, name, slug) {
   return parts.join(zh ? '' : ' ');
 }
 
+/** What a reply did to the drop it answers (ADR 0038): the same phrases as Feishu (packages/domain/src/notify/feishu.ts). */
+const REPLY_PHRASES = {
+  none: { en: (t) => `replied to ${t}`, zh: (t) => `回复了${t}` },
+  started: { en: (t) => `started on ${t}`, zh: (t) => `开始处理${t}` },
+  done: { en: (t) => `finished ${t}`, zh: (t) => `完成了${t}` },
+  declined: { en: (t) => `declined ${t}`, zh: (t) => `婉拒了${t}` },
+  needs_info: { en: (t) => `needs more information for ${t}`, zh: (t) => `需要补充信息才能处理${t}` },
+};
+
 /** Title and body for one pushed item, in the person's language. Every input is already sanitized. */
 function notificationText(lang, data) {
   const zh = lang === 'zh';
@@ -114,10 +123,14 @@ function notificationText(lang, data) {
       // set by the server only when this person may read the drop it answers (ADR 0016); same words as Feishu
       const original = safeTitle(data.reply_to_title);
       const mine = data.reply_to_mine === true;
+      // what the reply says about the answered drop's work (ADR 0038); without it, "replied to"
+      const phrase = Object.hasOwn(REPLY_PHRASES, data.reply_progress)
+        ? REPLY_PHRASES[data.reply_progress]
+        : REPLY_PHRASES.none;
       const reply = original
         ? zh
-          ? `${mention ? '，并' : ' '}回复了${mine ? '你的' : ''}「${original}」`
-          : `${mention ? ' and' : ''} replied to ${mine ? 'your ' : ''}“${original}”`
+          ? `${mention ? '，并' : ' '}${phrase.zh(`${mine ? '你的' : ''}「${original}」`)}`
+          : `${mention ? ' and' : ''} ${phrase.en(`${mine ? 'your ' : ''}“${original}”`)}`
         : '';
       if (group) {
         const where = zh

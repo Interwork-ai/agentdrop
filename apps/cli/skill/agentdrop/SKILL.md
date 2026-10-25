@@ -93,8 +93,10 @@ drop in your answer, then act:
 A reply is another handoff: pass the drop it answers as `payload.reply_to`, so the other person sees what it
 answers. Sending a reply marks that drop read for the user, and posting to a group marks the group's earlier drops
 read for the user. There is still no thread: a received drop's `reply_to` only names
-the drop it answers (when the user may read it), and `replies` on the user's sent drops counts the answers. Do not
-claim execution status or acknowledgement beyond what the returned data shows.
+the drop it answers (when the user may read it), and `replies` on the user's sent drops counts the answers, with
+each person's latest `progress`. A reply's `progress` (started, done, declined, needs_info) is what its author says,
+not something AgentDrop checked. Do not claim execution status or acknowledgement beyond what the returned data
+shows.
 To answer "has X read it", use `recipient_status` on the user's sent drop (`list_drops {"view":"sent"}` or
 `read_drop`): a person's `read_at`, or a group's `read_count`/`member_count` and `readers`. Read means opened,
 not acted on; opening a drop yourself shows its sender that the user has read it.
@@ -111,13 +113,17 @@ send its author a short acknowledgement, then start the work, and tell the user 
   other members see that it is being handled and do not pick it up twice. Title `Re: <original title>`; body one or
   two sentences in the drop's language that say what the user is going to do and, if known, when, for example
   "收到，我先复现划分 C 的问题，今天给你结果。". Never send an empty "OK", and never say more than the user decided.
-  Posting to the group also marks the group's earlier drops read for the user.
+  Set `payload.progress` to `started`. Posting to the group also marks the group's earlier drops read for the user.
 - Once per drop. Not when the user only asks to read or summarize it (the read receipt covers that), not for drops
   that ask for nothing, not when the user says not to tell the sender, and not in a run nobody watches.
-- When the work is done, send the result as another reply to the same drop, to the same place: what was done, where
-  the result is (files, commit, link) and anything still open. If the user stops without finishing, say so instead
-  of going quiet.
-- The reply marks the drop read for the user; its author is told "<user> replied to your «…»".
+- When the work is done, send the result as another reply to the same drop, to the same place, with
+  `payload.progress` `done`: what was done, where the result is (files, commit, link) and anything still open. If the
+  user decides not to do it, reply with `declined` and why; if they need something from the sender first, reply with
+  `needs_info` and say exactly what. If the user stops without finishing, say so instead of going quiet.
+- Set `progress` only as the user decided, and only on replies to drops that asked for something. A server that
+  refuses `progress` (VALIDATION_FAILED naming it) is older: send the same reply again without it.
+- The reply marks the drop read for the user; its author is told "<user> started on / finished / declined your «…»"
+  (or "replied to" without progress).
 
 ## Your own space
 

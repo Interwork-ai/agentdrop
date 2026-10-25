@@ -392,6 +392,22 @@ describe('agentdrop send: text, title and files', () => {
     });
     expect(sends[0]?.payload.reply_to).toBe(INBOX_DROP);
   });
+
+  it('says where the answered message’s work stands with --progress, and only together with --reply-to', async () => {
+    await sendCommand(capture(), {
+      profile: 'laptop',
+      to: '@wang',
+      body: 'all cleaned',
+      replyTo: 'abcdef',
+      progress: 'done',
+      stdin: noStdin,
+    });
+    expect(sends[0]?.payload).toMatchObject({ reply_to: INBOX_DROP, progress: 'done' });
+    await expect(
+      sendCommand(capture(), { profile: 'laptop', to: '@wang', body: 'x', progress: 'done', stdin: noStdin }),
+    ).rejects.toThrow('give that message with --reply-to');
+    expect(sends).toHaveLength(1);
+  });
 });
 
 describe('agentdrop send: outcomes', () => {

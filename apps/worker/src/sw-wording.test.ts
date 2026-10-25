@@ -135,6 +135,47 @@ describe('browser push wording matches Feishu', () => {
     expect((await render(reply, 'en')).body).toBe('Direct message: 王同学 (@bob)');
   });
 
+  it('names the progress a reply gives, in the same words as Feishu (ADR 0038)', async () => {
+    const reply = { ...drop, group_name: null, group_slug: null, mentioned: false, title: 'Re: Plan' };
+    const item = {
+      kind: 'drop' as const,
+      fromName: '王同学',
+      fromHandle: 'bob',
+      title: 'Re: Plan',
+      replyTo: { title: 'Plan', mine: true },
+      link: null,
+    };
+    const cases = [
+      ['started', 'started on your “Plan”', '开始处理你的「Plan」'],
+      ['done', 'finished your “Plan”', '完成了你的「Plan」'],
+      ['declined', 'declined your “Plan”', '婉拒了你的「Plan」'],
+      ['needs_info', 'needs more information for your “Plan”', '需要补充信息才能处理你的「Plan」'],
+    ] as const;
+    for (const [progress, en, zh] of cases) {
+      const payload = { ...reply, reply_to_title: 'Plan', reply_to_mine: true, reply_progress: progress };
+      expect((await render(payload, 'en')).body).toBe(`Direct message: 王同学 (@bob) ${en}`);
+      expect((await render(payload, 'zh')).body).toBe(`私信：王同学（@bob） ${zh}`);
+      expect(feishuLine({ ...item, progress }, 'en')).toContain(`"Direct message: 王同学 (@bob) ${en}"`);
+      expect(feishuLine({ ...item, progress }, 'zh')).toContain(`"私信：王同学（@bob） ${zh}"`);
+    }
+    // a group reply that also mentions the person
+    const group = {
+      ...drop,
+      title: 'Numbers',
+      reply_to_title: 'Plan',
+      reply_to_mine: false,
+      reply_progress: 'done',
+    };
+    expect((await render(group, 'zh')).body).toBe(
+      '群消息 ·「Core team」#core：王同学（@bob） @了你，并完成了「Plan」',
+    );
+    // an unknown value from a newer server reads as a plain reply
+    for (const odd of ['paused', 'constructor', '__proto__']) {
+      const unknown = { ...reply, reply_to_title: 'Plan', reply_to_mine: true, reply_progress: odd };
+      expect((await render(unknown, 'en')).body).toBe('Direct message: 王同学 (@bob) replied to your “Plan”');
+    }
+  });
+
   it('renders contact requests, invitations and join requests in the dashboard language', async () => {
     const contact = await render(
       { event_id: 'e2', kind: 'contact', from_handle: 'bob', from_display_name: '王同学' },

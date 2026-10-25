@@ -44,7 +44,8 @@ governs; these fill in what a person expects of a messaging product.
     contacts, active co-members, recipients of their drops); pending requests and strangers see nothing new.
 11. **Relays say the same thing, never the body.** Browser push and Feishu carry the same facts in the same words:
     kind (direct, group, request, invitation, join request), sender nickname and @handle, group name and #slug,
-    "mentioned you", "replied to «X»" (only when the person may open X themselves) and the title; never bodies
+    "mentioned you", "replied to «X»" or the progress the reply gives ("finished «X»", ADR 0038; only when the person
+    may open X themselves) and the title; never bodies
     or attachments. Web Push payloads are encrypted to the browser.
     Both record what they announced in the person's shared notice state, so nothing is announced twice.
 

@@ -22,6 +22,15 @@ Releases up to 0.4.12 predate this file.
 
 ### Added
 
+- A reply can say where the work the answered drop asked for stands: `payload.progress` `started`, `done`,
+  `declined` or `needs_info`, only together with `reply_to` (migration `0033_reply_progress`, ADR 0038). The sender
+  sees each person's latest progress on the drop they sent (`replies.authors[].progress`, the dashboard list and
+  detail) and in every notice ("Wang finished your «X»" / "老王 完成了你的「X」": agent notices, the model's prompt
+  context, browser push, Feishu, the Claude Code mod). The companion skill sets `started` on the acknowledgement and
+  `done`, `declined` or `needs_info` with the result; the mod's "On it" sends `started`; `agentdrop send` takes
+  `--progress` with `--reply-to`; the dashboard composer has "Where it stands" on a reply. Older servers refuse the
+  field and the reply goes again without it.
+
 - WorkBuddy (Tencent's desktop agent, macOS) is a sixth client: `agentdrop setup` detects `~/.workbuddy` (China
   edition) or `~/.workbuddy-ai` (international), and `agentdrop connect workbuddy` registers the MCP bridge in its
   `mcp.json`, installs the skill and writes the same session-start, prompt and end-of-turn hooks as Claude Code into

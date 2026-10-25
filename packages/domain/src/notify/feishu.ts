@@ -1,5 +1,5 @@
 import { createHash, createHmac } from 'node:crypto';
-import { AgentDropError } from '@agentdrop/contracts';
+import { AgentDropError, type ReplyProgress } from '@agentdrop/contracts';
 
 /*
  * Feishu (飞书) group-bot webhooks: the server posts a message to a custom bot the person added to a chat of their
@@ -59,6 +59,8 @@ export type FeishuItem =
       mentioned?: boolean;
       /** The drop this answers, when this person may read it (ADR 0016); `mine` when they wrote it. */
       replyTo?: { title: string; mine: boolean } | null;
+      /** Where the work the answered drop asked for stands, as the reply says (ADR 0038). */
+      progress?: ReplyProgress | null;
       link: string | null;
     }
   | { kind: 'contact'; fromName: string; fromHandle: string; link: string | null }
@@ -95,7 +97,7 @@ function noticeLine(item: Exclude<FeishuItem, { kind: 'test' }>, zh: boolean): s
       const from = person(item.fromName, item.fromHandle);
       const title = clean(item.title, 120) || (zh ? '无标题' : 'untitled');
       const mention = item.mentioned ? (zh ? ' @了你' : ' mentioned you') : '';
-      const reply = replyWords(item.replyTo, !!item.mentioned, zh);
+      const reply = replyWords(item.replyTo, !!item.mentioned, zh, item.progress);
       // a reply titled "Re: <original>" would only repeat what the reply words already say
       const quoted =
         item.replyTo && isReplyTitle(clean(item.title, 160), clean(item.replyTo.title, 160))
@@ -129,19 +131,34 @@ function noticeLine(item: Exclude<FeishuItem, { kind: 'test' }>, zh: boolean): s
   }
 }
 
+/** What a reply did to the drop it answers, by the progress it gives (ADR 0038); without progress it "replied to". */
+const REPLY_PHRASES: Record<
+  ReplyProgress | 'none',
+  { en: (t: string) => string; zh: (t: string) => string }
+> = {
+  none: { en: (t) => `replied to ${t}`, zh: (t) => `回复了${t}` },
+  started: { en: (t) => `started on ${t}`, zh: (t) => `开始处理${t}` },
+  done: { en: (t) => `finished ${t}`, zh: (t) => `完成了${t}` },
+  declined: { en: (t) => `declined ${t}`, zh: (t) => `婉拒了${t}` },
+  needs_info: { en: (t) => `needs more information for ${t}`, zh: (t) => `需要补充信息才能处理${t}` },
+};
+
 /**
- * " replied to your “X”" / " 回复了你的「X」", after the person (and after "mentioned you"). Shared wording with the
- * service worker (apps/web/public/sw.js); empty when the drop answers nothing the recipient may read.
+ * " replied to your “X”" / " 回复了你的「X」", or the progress the reply gives (" finished your “X”" / " 完成了你的「X」"),
+ * after the person (and after "mentioned you"). Shared wording with the service worker (apps/web/public/sw.js);
+ * empty when the drop answers nothing the recipient may read.
  */
 function replyWords(
   replyTo: { title: string; mine: boolean } | null | undefined,
   mentioned: boolean,
   zh: boolean,
+  progress?: ReplyProgress | null,
 ) {
   if (!replyTo) return '';
   const original = clean(replyTo.title, 60) || (zh ? '无标题' : 'untitled');
-  if (zh) return `${mentioned ? '，并' : ' '}回复了${replyTo.mine ? '你的' : ''}「${original}」`;
-  return `${mentioned ? ' and' : ''} replied to ${replyTo.mine ? 'your ' : ''}“${original}”`;
+  const phrase = REPLY_PHRASES[progress ?? 'none'];
+  if (zh) return `${mentioned ? '，并' : ' '}${phrase.zh(`${replyTo.mine ? '你的' : ''}「${original}」`)}`;
+  return `${mentioned ? ' and' : ''} ${phrase.en(`${replyTo.mine ? 'your ' : ''}“${original}”`)}`;
 }
 
 /** "Re: X" (any case, also "Re：" and "回复：") for the original title X. */

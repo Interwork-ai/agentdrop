@@ -3,7 +3,8 @@
 - Status: Accepted
 - Date: 2026-10-01
 - Refines: ADR 0016 (replies name the drop they answer)
-- Refined by: ADR 0026 (show a received drop to the user before acting on it)
+- Refined by: ADR 0026 (show a received drop to the user before acting on it), ADR 0038 (a reply can say where the
+  work stands)
 
 ## Context
 

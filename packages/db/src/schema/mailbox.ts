@@ -87,6 +87,8 @@ export const contacts = pgTable(
 );
 
 /* ------------------------------------------------------------------ groups */
+/** Where the work asked for in the answered drop stands, said by a reply (`payload.progress`, ADR 0038). */
+export const replyProgressEnum = pgEnum('reply_progress', ['started', 'done', 'declined', 'needs_info']);
 export const membershipRoleEnum = pgEnum('membership_role', ['owner', 'admin', 'member']);
 export const membershipStatusEnum = pgEnum('membership_status', ['invited', 'active', 'left', 'removed']);
 export const groupInvitePolicyEnum = pgEnum('group_invite_policy', ['open', 'admin_approval']);
@@ -286,6 +288,8 @@ export const drops = pgTable(
      * it only when they may read the original. Set null if the original row is ever deleted.
      */
     replyToDropId: uuid('reply_to_drop_id').references((): AnyPgColumn => drops.id, { onDelete: 'set null' }),
+    /** `payload.progress` of a reply (ADR 0038): metadata like `reply_to`, kept in the clear. Null otherwise. */
+    progress: replyProgressEnum('progress'),
   },
   (t) => [
     index('drops_origin_idx').on(t.originHId, t.createdAt),

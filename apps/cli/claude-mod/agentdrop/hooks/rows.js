@@ -9,10 +9,18 @@ const T = {
     alsoMentioned: ' · mentioned you',
     direct: (from, title) => `${from} · "${title}"`,
     mention: (from, group, title) => `${from} mentioned you in ${group} · "${title}"`,
-    replyMine: (from, original, title) => `${from} replied to your "${original}" · "${title}"`,
-    replyMineOnly: (from, original) => `${from} replied to your "${original}"`,
-    reply: (from, original, title) => `${from} replied to "${original}" · "${title}"`,
-    replyOnly: (from, original) => `${from} replied to "${original}"`,
+    // what a reply did to the drop it answers (ADR 0038); the same verbs as every other notice
+    verbs: {
+      none: 'replied to',
+      started: 'started on',
+      done: 'finished',
+      declined: 'declined',
+      needs_info: 'needs more information for',
+    },
+    replyMine: (from, v, original, title) => `${from} ${v} your "${original}" · "${title}"`,
+    replyMineOnly: (from, v, original) => `${from} ${v} your "${original}"`,
+    reply: (from, v, original, title) => `${from} ${v} "${original}" · "${title}"`,
+    replyOnly: (from, v, original) => `${from} ${v} "${original}"`,
     files: (n) => ` · ${n} file${n > 1 ? 's' : ''}`,
     group: (group, n, who) => `${group} · ${n} new message${n > 1 ? 's' : ''}${who ? ` (${who})` : ''}`,
     groupLabel: (name, slug) => (name ? `“${name}” #${slug}` : `#${slug}`),
@@ -58,10 +66,17 @@ const T = {
     alsoMentioned: ' · @了你',
     direct: (from, title) => `${from} ·「${title}」`,
     mention: (from, group, title) => `${from} 在 ${group} @了你 ·「${title}」`,
-    replyMine: (from, original, title) => `${from} 回复了你的「${original}」·「${title}」`,
-    replyMineOnly: (from, original) => `${from} 回复了你的「${original}」`,
-    reply: (from, original, title) => `${from} 回复了「${original}」·「${title}」`,
-    replyOnly: (from, original) => `${from} 回复了「${original}」`,
+    verbs: {
+      none: '回复了',
+      started: '开始处理',
+      done: '完成了',
+      declined: '婉拒了',
+      needs_info: '需要补充信息才能处理',
+    },
+    replyMine: (from, v, original, title) => `${from} ${v}你的「${original}」·「${title}」`,
+    replyMineOnly: (from, v, original) => `${from} ${v}你的「${original}」`,
+    reply: (from, v, original, title) => `${from} ${v}「${original}」·「${title}」`,
+    replyOnly: (from, v, original) => `${from} ${v}「${original}」`,
     files: (n) => ` · ${n} 个附件`,
     group: (group, n, who) => `${group} · ${n} 条新消息${who ? `（${who}）` : ''}`,
     groupLabel: (name, slug) => (name ? `「${name}」#${slug}` : `#${slug}`),
@@ -343,11 +358,12 @@ export function buildRows(data, dismissed, surface = 'band', since = undefined) 
     const reply = original && d.reply_to_mine !== false;
     // a reply titled "Re: <original>" says nothing more than "replied to <original>"
     const redundant = reply && /^re:\s*/i.test(title) && title.replace(/^re:\s*/i, '') === original;
+    const verb = t.verbs[Object.hasOwn(t.verbs, d.reply_progress) ? d.reply_progress : 'none'];
     const description =
       (reply
         ? redundant
-          ? (mine ? t.replyMineOnly : t.replyOnly)(from, original)
-          : (mine ? t.replyMine : t.reply)(from, original, title)
+          ? (mine ? t.replyMineOnly : t.replyOnly)(from, verb, original)
+          : (mine ? t.replyMine : t.reply)(from, verb, original, title)
         : d.mentioned && group
           ? t.mention(from, group, title)
           : t.direct(from, title)) + (d.attachments > 0 ? t.files(d.attachments) : '');

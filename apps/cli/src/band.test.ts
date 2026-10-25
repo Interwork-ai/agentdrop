@@ -64,6 +64,8 @@ let pages: Drop[][] = [];
 let unreadCount = 0;
 let details: Record<string, Drop> = {};
 let sendRefusesMentions = false;
+/** A server before ADR 0038: its strict payload refuses `progress`, the way zod words it. */
+let sendRefusesProgress = false;
 let sendOutcome = 'delivered';
 let conflictOnce: string | null = null;
 /** A state change of these drops fails with this code (every time). */
@@ -127,7 +129,11 @@ beforeAll(async () => {
     }
     if (url === '/v1/h/drops' && req.method === 'POST') {
       const b = await body(req);
-      const payload = b.payload as { mentions?: string[] };
+      const payload = b.payload as { mentions?: string[]; progress?: string };
+      if (sendRefusesProgress && payload.progress)
+        return apiError(res, 400, 'VALIDATION_FAILED', {
+          details: { issues: [{ path: 'payload', message: 'Unrecognized key: "progress"' }] },
+        });
       if (sendRefusesMentions && payload.mentions?.length)
         return apiError(res, 400, 'VALIDATION_FAILED', { details: { field: 'mentions', handle: 'wang' } });
       if (sendConflict) return apiError(res, 409, 'IDEMPOTENCY_CONFLICT');
@@ -220,6 +226,7 @@ beforeEach(() => {
   // every test starts without a band cache
   rmSync(join(dir, 'state', 'band'), { recursive: true, force: true });
   sendRefusesMentions = false;
+  sendRefusesProgress = false;
   sendOutcome = 'delivered';
   conflictOnce = null;
   patchFails = {};
@@ -390,7 +397,12 @@ describe('the band commands', () => {
     expect(sent.at(-1)).toMatchObject({
       request_id: `ack:${id(1)}:en`,
       targets: [{ type: 'user', user_id: WANG }],
-      payload: { title: 'Re: Direct question', reply_to: id(1), body: "Got it, I'm on it." },
+      payload: {
+        title: 'Re: Direct question',
+        reply_to: id(1),
+        body: "Got it, I'm on it.",
+        progress: 'started',
+      },
     });
     expect(lastPayload().mentions).toBeUndefined();
     expect(direct.results[0]).toMatchObject({
@@ -454,6 +466,15 @@ describe('the band commands', () => {
     details[id(7)] = drop(7, 'Mine', { author: { user_id: ME, handle: 'me', display_label: 'Me' } });
     const own = await ackCommand(capture().out, { profile: 'cc', dropId: id(7) }).catch((e) => e);
     expect(modFailure(own)).toEqual({ error: { code: 'OWN_DROP' }, language: 'en' });
+  });
+
+  it('"On it" to a server before reply progress sends the same reply without it (ADR 0038)', async () => {
+    sendRefusesProgress = true;
+    const old = capture();
+    await ackCommand(old.out, { profile: 'cc', dropId: id(1) });
+    expect(sent.at(-1)).toMatchObject({ request_id: `ack:${id(1)}:en`, payload: { reply_to: id(1) } });
+    expect(lastPayload().progress).toBeUndefined();
+    expect(old.results[0]).toMatchObject({ outcome: 'delivered' });
   });
 
   it('"Mark read" on a group row marks exactly its drops, retrying a moved version once', async () => {

@@ -1,7 +1,8 @@
 /**
  * Replies (ADR 0016): "Reply" on a received drop opens the composer addressed to its sender with "Re: …" and the
  * reference to the drop it answers; the recipient sees "Reply to “…”" linking to the original; the sender of the
- * original sees who replied; and sending the reply marks the original read for the replier. Posting in a group
+ * original sees who replied and where they say the work stands (ADR 0038); and sending the reply marks the original
+ * read for the replier. Posting in a group
  * marks the group's earlier drops read for the poster, and for nobody else.
  *
  * People: alice (replies, posts in the group), bob (asks; is answered), carol (writes in the group).
@@ -60,6 +61,8 @@ async function asAlice(ctx, alice, carol) {
   });
   await step('sending the reply marks the question read for the replier', async () => {
     await page.getByPlaceholder(/Write down the confirmed context/).fill(ANSWER_BODY);
+    // the reply says the asked-for work is done
+    await page.getByLabel('Where it stands').selectOption('done');
     await page.getByRole('button', { name: 'Send message' }).click();
     await see('Delivered');
     if ((await unreadTitles(alice)).includes(QUESTION)) throw new Error('the question is still unread');
@@ -102,16 +105,17 @@ async function asBob(ctx, bob) {
     await list.getByText(`Re: ${QUESTION}`, { exact: true }).first().click();
     await see(ANSWER_BODY);
     await page.getByRole('link', { name: `Reply to “${QUESTION}”` }).waitFor();
+    await page.getByRole('main').getByText('Done', { exact: true }).first().waitFor();
   });
   await step('"Reply to" opens the original', async () => {
     await page.getByRole('link', { name: `Reply to “${QUESTION}”` }).click();
     await page.getByRole('heading', { name: QUESTION, level: 2 }).waitFor();
-    await see('1 reply from Alice @rp_alice');
+    await see('1 reply from Alice @rp_alice (Done)');
   });
   await step('the sent list shows that the question has a reply', async () => {
     await nav('Sent');
     const row = list.getByRole('button').filter({ hasText: QUESTION }).first();
-    await row.locator('[title="1 reply from Alice @rp_alice"]').waitFor();
+    await row.locator('[title="1 reply from Alice @rp_alice (Done)"]').waitFor();
   });
   await context.close();
 }

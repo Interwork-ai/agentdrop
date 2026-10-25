@@ -73,7 +73,7 @@ export function withoutGroupHistorySource(value: unknown): unknown {
 
 /**
  * Result fields added after 0.4.11. Each name is used nowhere else in any result, so removing the key wherever it
- * appears is exact: `public_email` (ADR 0012), `group_labels`, `mentions`, `mentioned_me`, `muted`, `reply_to` and `replies` on drops (ADR 0016), `active_members` on group cards, `history_visible` on groups (ADR 0022).
+ * appears is exact: `public_email` (ADR 0012), `group_labels`, `mentions`, `mentioned_me`, `muted`, `reply_to` and `replies` on drops (ADR 0016), `progress` on drops and reply authors (ADR 0038), `active_members` on group cards, `history_visible` on groups (ADR 0022).
  */
 const NEWER_FIELDS = new Set([
   'public_email',
@@ -85,6 +85,7 @@ const NEWER_FIELDS = new Set([
   'muted',
   'reply_to',
   'replies',
+  'progress',
   'history_visible',
   // group file space (ADR 0029)
   'storage',
