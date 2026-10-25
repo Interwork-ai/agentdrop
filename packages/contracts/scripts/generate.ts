@@ -170,5 +170,16 @@ const toolsListBytes = Buffer.byteLength(
 console.log(
   `[contracts] canonical standard tools/list JSON size: ${toolsListBytes} UTF-8 bytes (not a token measurement)`,
 );
+/*
+ * Every agent session carries the tool list in its context, so it has a budget: details belong in the companion
+ * skill, and a description grows only by what a model cannot do without at the moment it calls the tool.
+ */
+const TOOLS_LIST_BUDGET_BYTES = 18_000;
+if (toolsListBytes > TOOLS_LIST_BUDGET_BYTES) {
+  console.error(
+    `[contracts] the standard tools/list is ${toolsListBytes} bytes, over its budget of ${TOOLS_LIST_BUDGET_BYTES}: move detail into the companion skill`,
+  );
+  process.exit(1);
+}
 
 if (check && drift) process.exit(1);
