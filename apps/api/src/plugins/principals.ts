@@ -5,6 +5,7 @@ import {
   consumeRateLimit,
   getUserByAuthId,
   type HPrincipal,
+  rateLimitKeyHasher,
   type UserPrincipal,
 } from '@agentdrop/domain';
 import type { FastifyReply, FastifyRequest } from 'fastify';
@@ -97,16 +98,17 @@ export function createIpLimiter(ctx: AppContext, opts: { name: string; windowMs:
  * The same window, keyed by whatever identifies the caller. Authenticated bulk routes want the account, not the
  * address: per-IP both punishes everyone behind one NAT and is sidestepped by moving the same credential to a
  * second address. Counted in the shared `rate_limits` table, so every API process enforces one limit; `name` keeps
- * one limiter's keys apart from another's.
+ * one limiter's keys apart from another's. Only a keyed hash of name and key is stored (`rateLimitKeyHasher`).
  */
 export function createKeyLimiter(
   ctx: AppContext,
   opts: { name: string; windowMs: number; max: number; key: (req: FastifyRequest) => string },
 ) {
+  const hash = rateLimitKeyHasher(ctx.config.AUTH_SECRET);
   return async (req: FastifyRequest): Promise<void> => {
     const { allowed } = await consumeRateLimit(
       ctx.db.drizzle,
-      `${opts.name}:${opts.key(req)}`,
+      hash(opts.name, opts.key(req)),
       opts.windowMs,
       opts.max,
     );

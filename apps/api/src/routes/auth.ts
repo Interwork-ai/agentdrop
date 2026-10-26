@@ -47,6 +47,8 @@ const RESET_REQUESTS_PER_EMAIL_PER_HOUR = 3;
 /** Recovery-code attempts: a code has ~60 bits, so these only slow down a careless script. */
 const RECOVERY_ATTEMPTS_PER_IP_PER_HOUR = 20;
 const RECOVERY_ATTEMPTS_PER_EMAIL_PER_HOUR = 5;
+/** The longest email address accepted anywhere (RFC 5321 path limit); longer ones are refused before any limiter. */
+const MAX_EMAIL_LENGTH = 320;
 
 export async function authRoutes(app: FastifyInstance, ctx: AppContext): Promise<void> {
   const resetIpLimiter = createIpLimiter(ctx, {
@@ -79,6 +81,9 @@ export async function authRoutes(app: FastifyInstance, ctx: AppContext): Promise
             'FORBIDDEN',
             'this server does not send email; ask an administrator for a password reset link',
           );
+        const email = (req.body as { email?: unknown } | undefined)?.email;
+        if (typeof email === 'string' && email.length > MAX_EMAIL_LENGTH)
+          throw new AgentDropError('VALIDATION_FAILED', 'email is too long');
         await resetIpLimiter(req);
         await resetEmailLimiter(req);
       }
@@ -116,12 +121,13 @@ export async function authRoutes(app: FastifyInstance, ctx: AppContext): Promise
     },
   });
   app.post('/v1/auth/recover-with-code', async (req, reply) => {
-    await recoverIpLimiter(req);
-    await recoverEmailLimiter(req);
+    // validated first: a malformed request does nothing, and a limiter only ever sees a bounded email
     const body = parse(
-      z.object({ email: z.string().min(3).max(320), code: z.string().min(1).max(64) }).strict(),
+      z.object({ email: z.string().min(3).max(MAX_EMAIL_LENGTH), code: z.string().min(1).max(64) }).strict(),
       req.body,
     );
+    await recoverIpLimiter(req);
+    await recoverEmailLimiter(req);
     const target = await withTx(ctx.db, (tx) => redeemRecoveryCode(tx, body.email, body.code));
     reply.header('Cache-Control', 'no-store');
     return issueResetLink(ctx, target);

@@ -73,7 +73,8 @@ since a transaction-mode pooler accepts LISTEN but never delivers a notification
 **Client addresses and `TRUST_PROXY`.** Rate limits (sign-in: 3 attempts in 10 s per address; password reset,
 recovery codes and pairing per address) use the client address the API sees. Except sign-in (Better Auth's own,
 per process), they are counted in the `rate_limits` table, so they hold as one limit however many API processes
-serve. Set `TRUST_PROXY=true` exactly when a
+serve; the table stores a keyed hash, never the address or email, and every API process needs the same
+`AUTH_SECRET` for the limits to be shared. Set `TRUST_PROXY=true` exactly when a
 reverse proxy you run (Caddy, nginx) sits in front of the API and sets `X-Forwarded-For`; `compose.production.yaml`
 does. Without a proxy, leave it `false`: a client could otherwise write that header itself. Behind a proxy with it
 `false`, every visitor looks like the proxy and shares one sign-in limit. A plain TCP forward that does not keep

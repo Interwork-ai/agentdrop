@@ -47,12 +47,18 @@ describe.skipIf(!TEST_DATABASE_URL)('pairing start is limited per address', () =
     const other = createDatabase(TEST_DATABASE_URL as string, { max: 2 });
     try {
       const limiter = (db: Database) =>
-        createKeyLimiter({ db } as AppContext, {
-          name: 'shared',
-          windowMs: 60_000,
-          max: 3,
-          key: () => 'one',
-        });
+        createKeyLimiter(
+          {
+            db,
+            config: { AUTH_SECRET: 'test-secret-test-secret-test-secret-0000' },
+          } as unknown as AppContext,
+          {
+            name: 'shared',
+            windowMs: 60_000,
+            max: 3,
+            key: () => 'one',
+          },
+        );
       const here = limiter(t.db);
       const there = limiter(other);
       const req = {} as FastifyRequest;

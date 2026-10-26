@@ -255,8 +255,10 @@ reachable by a human at a terminal or through the dashboard session.
   8 attempts; handlers are idempotent. Delivery never waits for it. Delivered and dead-lettered events are swept
   after the event retention window; a pending one never is.
 - Rate limits: one row per key and window in `rate_limits`, incremented in a single upsert, so every API process
-  enforces the same limit (Better Auth's sign-in limit stays per process). A search's concurrency cap is per process
-  on purpose: it bounds that process's CPU.
+  enforces the same limit (Better Auth's sign-in limit stays per process). The key is a hex HMAC-SHA256 of the
+  limiter's name and the raw key (email, address, account) under a key derived from `AUTH_SECRET`, so the table holds
+  no one's email or address; changing `AUTH_SECRET` starts every window afresh. The worker sweeps ended windows in
+  batches. A search's concurrency cap is per process on purpose: it bounds that process's CPU.
 - Reads cost a fixed number of queries per page: who each drop went to, read receipts and replies are computed for
   the page at once (`privateRecipientsMany`, `*ForDrops`), never per drop.
 - `packages/domain/src/mailbox/read.ts` holds the reads; `state.ts` the person's read/starred/archived changes.
