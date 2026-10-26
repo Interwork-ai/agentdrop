@@ -217,6 +217,20 @@ reminders off. Both are worker settings.
 Migrations are expand → migrate → contract; the `migrate` service runs once before the new API starts. Roll back by
 redeploying the previous image; do not run destructive down-migrations.
 
+The migrator runs each migration inside a transaction, so a migration that adds an index builds it with a plain
+`CREATE INDEX`, which blocks writes to that table until it is built. Migration 0035 indexes `mailbox_events`, which
+no release before it ever swept: on a server with a long history, build that index by hand before upgrading, while
+the old version keeps serving, so the migration finds it and does nothing:
+
+```sql
+CREATE INDEX CONCURRENTLY IF NOT EXISTS "mailbox_events_created_idx" ON "mailbox_events" USING btree ("created_at");
+-- must answer t; if it answers f, the build was interrupted: DROP INDEX CONCURRENTLY "mailbox_events_created_idx";
+-- and run the CREATE again
+SELECT indisvalid FROM pg_index WHERE indexrelid = 'mailbox_events_created_idx'::regclass;
+```
+
+Run it with `psql` outside a transaction block (`CONCURRENTLY` refuses to run inside one).
+
 On a compose host, `deploy/pull-deploy.sh sha256:<digest>` deploys a CI-built image by digest (`--rollback` returns
 to the previous one). It looks after the disk, since every image is about 1.3 GB:
 
