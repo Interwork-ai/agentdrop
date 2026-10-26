@@ -5,7 +5,7 @@
  * (ADR 0033), and a drop that appears in an open inbox by itself through the event stream (ADR 0040).
  */
 import { readFile } from 'node:fs/promises';
-import { connect, group, sendDrop, signUp, toGroup, toPerson } from '../api.mjs';
+import { call, connect, group, sendDrop, signUp, toGroup, toPerson } from '../api.mjs';
 
 export const name = 'mailbox';
 
@@ -16,6 +16,7 @@ const LONG = 'MB long read';
 const ATTACHED = 'MB notes with a file';
 const OWN_POST = 'MB my own group post';
 const LIVE = 'MB arrived while open';
+const SENT_LIVE = 'MB sent while Sent was open';
 const TEXT_FILE = { name: 'mb-notes.txt', mimeType: 'text/plain', buffer: Buffer.from('hello attachment\n') };
 const HTML_FILE = {
   name: 'mb-page.html',
@@ -284,6 +285,38 @@ async function asCarol(ctx, carol, alice) {
     if (!frames.some((data) => data.includes('"delivery.created"') && data.includes(sent.drop_id)))
       throw new Error('no event stream frame announced the new drop');
   });
+  await step(
+    'a drop I send elsewhere appears in Sent, and its receipt turns to read, by themselves',
+    async () => {
+      await nav('Sent');
+      await page.waitForURL(/\/app\/sent$/);
+      let quietSince = Date.now();
+      await until(() => {
+        if (listing.size) quietSince = Date.now();
+        return Date.now() - quietSince >= 600;
+      }, 'the sent view to stop refetching');
+      // sent from another session (as an agent or the CLI would): nothing in this tab asked for it
+      const mine = await sendDrop(carol, [toPerson(alice)], SENT_LIVE, 'Sent while my Sent view was open.');
+      const row = list.locator(`[data-drop-id="${mine.drop_id}"]`);
+      // Sent also polls every 10 s; only the stream brings it in well under that.
+      await row.waitFor({ timeout: 5_000 });
+      const announced = () =>
+        frames.filter((data) => data.includes('"sent.changed"') && data.includes(mine.drop_id));
+      if (!announced().length) throw new Error('no event stream frame announced my own send');
+      if (!(await row.getAttribute('aria-label'))?.includes('Unread'))
+        throw new Error('my new drop does not start unread');
+      // Alice opens it: the receipt moves, and the stream says so without saying who
+      await call(alice.jar, 'GET', `/v1/me/endpoints/${alice.h}/drops/${mine.drop_id}`);
+      await until(() => announced().length >= 2, 'the stream to announce the receipt', 5_000);
+      const deadline = Date.now() + 5_000;
+      while (!(await row.getAttribute('aria-label'))?.includes(', Read,')) {
+        if (Date.now() > deadline) throw new Error('the receipt did not turn to read by itself');
+        await page.waitForTimeout(50);
+      }
+      if (announced().some((data) => data.includes(alice.h) || data.includes(alice.me.user_id)))
+        throw new Error('the receipt event names the reader');
+    },
+  );
   await context.close();
 }
 
