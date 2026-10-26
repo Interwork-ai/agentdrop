@@ -299,10 +299,15 @@ export async function readEvents(
   };
 }
 
-/** Deletes up to `batch` mailbox events older than `before` (retention, ADR 0040); returns how many went. */
+/**
+ * Deletes up to `batch` mailbox events older than `before` (retention, ADR 0040), oldest first; returns how many
+ * went. Ordered by `created_at`, as `mailbox_events_created_idx` is, so each batch reads the index from its start
+ * instead of sorting every expired row by id. A hole this leaves in an agent's range is what readEvents answers
+ * with RESYNC_REQUIRED.
+ */
 export async function sweepMailboxEvents(tx: Tx, before: Date, batch = 5000): Promise<number> {
   const result = await tx.execute(sql`
     delete from ${mailboxEvents} where ${mailboxEvents.id} in (
-      select e.id from ${mailboxEvents} e where e.created_at < ${before} order by e.id limit ${batch})`);
+      select e.id from ${mailboxEvents} e where e.created_at < ${before} order by e.created_at limit ${batch})`);
   return result.rowCount ?? 0;
 }
