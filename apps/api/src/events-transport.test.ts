@@ -256,7 +256,9 @@ describeDb('the event stream as a long-lived request', () => {
     stream.close();
   });
 
-  it('cuts off a client that stopped reading instead of buffering every batch', async () => {
+  it('cuts off a client that stopped reading instead of buffering every batch', {
+    timeout: 60_000,
+  }, async () => {
     let streamRes: ServerResponse | null = null;
     const onRequest = (req: { url?: string }, res: ServerResponse) => {
       if (req.url?.startsWith('/v1/h/events')) streamRes = res;
@@ -273,13 +275,18 @@ describeDb('the event stream as a long-lived request', () => {
       for (let i = 0; i < 100 && !(streamRes as ServerResponse | null)?.headersSent; i++) await sleep(20);
       const res = streamRes as ServerResponse | null;
       if (!res) throw new Error('the stream never started');
-      // far more than the sockets hold: 300 pages of 100 events, read back to back
-      await fabricate(bobH.hId, 30_000);
-      await t.db.pool.query('select pg_notify($1, $2)', ['agentdrop_events', bob.userId]);
+      // More than the sockets hold, read back to back. How much that is depends on the kernel: Linux grows a
+      // loopback socket's buffers to several megabytes, macOS does not, so events are added in rounds of 300 pages
+      // of 100 until the stream gives up on the client, not in one fixed amount.
       let buffered = 0;
-      for (let i = 0; i < 100 && !res.destroyed; i++) {
-        buffered = Math.max(buffered, res.writableLength);
-        await sleep(50);
+      const deadline = Date.now() + 40_000;
+      for (let round = 0; round < 12 && !res.destroyed && Date.now() < deadline; round++) {
+        await fabricate(bobH.hId, 30_000);
+        await t.db.pool.query('select pg_notify($1, $2)', ['agentdrop_events', bob.userId]);
+        for (let i = 0; i < 60 && !res.destroyed; i++) {
+          buffered = Math.max(buffered, res.writableLength);
+          await sleep(50);
+        }
       }
       expect(res.destroyed).toBe(true);
       // nothing more was read while it lagged: at most one page past the socket's own buffer
