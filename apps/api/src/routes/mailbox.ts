@@ -40,6 +40,37 @@ const SEARCH_PER_MINUTE = 30;
 const SEARCH_CONCURRENT = 2;
 
 /**
+ * At most `max` searches per person at a time in this process, each also counted by `perMinute`. Returns a release
+ * function the caller runs exactly once when the search is done. The slot is taken before `perMinute` is awaited (a
+ * database round trip), so requests arriving meanwhile see it, and given back when `perMinute` refuses or fails.
+ */
+export function createSearchSlots(perMinute: (req: FastifyRequest) => Promise<void>, max: number) {
+  const running = new Map<string, number>();
+  const leave = (userId: string) => {
+    const left = (running.get(userId) ?? 1) - 1;
+    if (left <= 0) running.delete(userId);
+    else running.set(userId, left);
+  };
+  return async (req: FastifyRequest, userId: string): Promise<() => void> => {
+    const now = running.get(userId) ?? 0;
+    if (now >= max) throw new AgentDropError('RATE_LIMITED');
+    running.set(userId, now + 1);
+    try {
+      await perMinute(req);
+    } catch (err) {
+      leave(userId);
+      throw err;
+    }
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      leave(userId);
+    };
+  };
+}
+
+/**
  * Mailbox routes are registered twice with different scope resolvers:
  *   /v1/h/...                     H credential: scope fixed by the credential (bridge / MCP)
  *   /v1/me/endpoints/:h_id/...    browser session: scope = one of MY endpoints, ownership verified
@@ -146,17 +177,7 @@ function registerMailboxRoutes(
     max: SEARCH_PER_MINUTE,
     key: (req) => (req.hAuth?.user.userId ?? req.userPrincipal?.userId ?? req.ip) as string,
   });
-  const running = new Map<string, number>();
-  const searchSlot = async (req: FastifyRequest, userId: string): Promise<() => void> => {
-    if ((running.get(userId) ?? 0) >= SEARCH_CONCURRENT) throw new AgentDropError('RATE_LIMITED');
-    await perMinute(req);
-    running.set(userId, (running.get(userId) ?? 0) + 1);
-    return () => {
-      const left = (running.get(userId) ?? 1) - 1;
-      if (left <= 0) running.delete(userId);
-      else running.set(userId, left);
-    };
-  };
+  const searchSlot = createSearchSlots(perMinute, SEARCH_CONCURRENT);
 
   app.get(`${prefix}/drops`, async (req) => {
     const scope = await resolve(req);
