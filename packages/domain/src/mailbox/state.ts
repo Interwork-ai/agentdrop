@@ -4,7 +4,7 @@ import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { MailboxScope } from '../principals.js';
 import { hasValidGrant, loadAuthorizedDrop, visibleEndpointIds } from './authorization.js';
 import { notExpired, notOwnGroupPost, notSelfDrop, unreadCountForEndpoints } from './read.js';
-import { bumpMailboxes, type MailboxEventInput } from './revision.js';
+import { bumpMailboxes, type MailboxEventInput, sentChangedEvents } from './revision.js';
 
 /*
  * The person's read, starred and archived state (ADR 0007: one state per person, on every delivery of a drop to
@@ -92,10 +92,15 @@ export async function setDropState(
         mine.map((d) => d.id),
       ),
     );
-  await bumpMailboxes(
-    tx,
-    mine.map((d) => ({ hId: d.hId, type: 'delivery.state' as const, dropId: d.dropId, deliveryId: d.id })),
-  );
+  // The author's receipt follows the earliest open or read of this person's copies (receiptsForDrops): when that
+  // moves, the author's streams hear of it as `sent.changed`. Starring and archiving are this person's own business
+  // and announce nothing to the author.
+  const receiptMoved =
+    receiptOf(mine) !== receiptOf(mine.map((d) => ({ openedAt: d.openedAt, readAt: patch.readAt })));
+  await bumpMailboxes(tx, [
+    ...mine.map((d) => ({ hId: d.hId, type: 'delivery.state' as const, dropId: d.dropId, deliveryId: d.id })),
+    ...(receiptMoved ? await sentChangedEvents(tx, [input.drop_id]) : []),
+  ]);
   return {
     drop_id: input.drop_id,
     read: patch.readAt !== null,
@@ -103,6 +108,12 @@ export async function setDropState(
     archived: patch.archivedAt !== null,
     state_version: patch.stateVersion,
   };
+}
+
+/** What the author's receipt shows for one person's copies of a drop: the earliest open or read, as epoch ms. */
+function receiptOf(copies: Array<{ openedAt: Date | null; readAt: Date | null }>): number | null {
+  const times = copies.flatMap((d) => [d.openedAt, d.readAt]).filter((t): t is Date => t !== null);
+  return times.length ? Math.min(...times.map((t) => t.getTime())) : null;
 }
 
 /**
@@ -159,7 +170,7 @@ export async function markAllRead(
     .innerJoin(drops, eq(drops.id, deliveries.dropId))
     .where(unreadInView);
   return {
-    marked: new Set(events.map((e) => e.dropId)).size,
+    marked: new Set(events.filter((e) => e.type === 'delivery.state').map((e) => e.dropId)).size,
     remaining: left[0]?.n ?? 0,
     unread_count: await unreadCountForEndpoints(tx, visibility.hIds),
   };
@@ -170,7 +181,9 @@ export async function markAllRead(
  * drop to any of their agents, all ending on the same new version), but without an expected version: it is applied
  * by the person's own send (ADR 0016), not a client's toggle. Drops already read everywhere are left alone, and only
  * deliveries with a valid grant change.
- * Returns the mailbox events for the caller to bump together with its own, so heads are locked once, in order.
+ * Returns the mailbox events for the caller to bump together with its own, so heads are locked once, in order:
+ * `delivery.state` for the person's agents, and `sent.changed` for the author of each drop this person had neither
+ * opened nor read before (their receipt now shows it read).
  */
 export async function markReadForPerson(
   tx: Tx,
@@ -197,8 +210,10 @@ export async function markReadForPerson(
   for (const { d } of rows) byDrop.set(d.dropId, [...(byDrop.get(d.dropId) ?? []), d]);
   const now = new Date();
   const events: MailboxEventInput[] = [];
+  const firstRead: string[] = [];
   for (const [dropId, mine] of byDrop) {
     if (mine.every((d) => d.readAt !== null)) continue;
+    if (receiptOf(mine) === null) firstRead.push(dropId);
     const readAt = mine
       .map((d) => d.readAt)
       .reduce<Date | null>((a, b) => (b && (!a || b < a) ? b : a), null);
@@ -213,5 +228,5 @@ export async function markReadForPerson(
       );
     for (const d of mine) events.push({ hId: d.hId, type: 'delivery.state', dropId, deliveryId: d.id });
   }
-  return events;
+  return [...events, ...(await sentChangedEvents(tx, firstRead))];
 }

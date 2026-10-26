@@ -1,12 +1,18 @@
-import { harnessEndpoints, mailboxEvents, mailboxHeads, type Tx } from '@agentdrop/db';
-import { eq, inArray, sql } from 'drizzle-orm';
+import { drops, harnessEndpoints, mailboxEvents, mailboxHeads, type Tx } from '@agentdrop/db';
+import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 
 /** PostgreSQL channel that wakes event-stream readers (ADR 0040); the payload is the affected person's user id. */
 export const EVENTS_CHANNEL = 'agentdrop_events';
 
 export interface MailboxEventInput {
   hId: string;
-  type: 'delivery.created' | 'delivery.state' | 'grant.revoked' | 'drop.revoked' | 'attachment.removed';
+  type:
+    | 'delivery.created'
+    | 'delivery.state'
+    | 'grant.revoked'
+    | 'drop.revoked'
+    | 'attachment.removed'
+    | 'sent.changed';
   dropId?: string | null;
   deliveryId?: string | null;
   payload?: Record<string, unknown>;
@@ -67,6 +73,22 @@ export async function bumpMailboxes(tx: Tx, events: MailboxEventInput[]): Promis
       select distinct ${harnessEndpoints.userId} as user_id from ${harnessEndpoints}
       where ${inArray(harnessEndpoints.id, hIds)}) p`);
   return result;
+}
+
+/**
+ * `sent.changed` for the author of each of `dropIds` (ADR 0040): written to the agent that sent the drop. That is
+ * exactly whom the one authorization predicate lets read it as its sender: that agent, and with account-wide reads
+ * every agent of the author, whose streams include the sending agent's events. The event carries the drop id only,
+ * never which recipient, agent or device caused it (ADR 0013). Revoked drops are left out: nobody reads them.
+ */
+export async function sentChangedEvents(tx: Tx, dropIds: string[]): Promise<MailboxEventInput[]> {
+  if (dropIds.length === 0) return [];
+  const rows = await tx
+    .select({ id: drops.id, originHId: drops.originHId })
+    .from(drops)
+    .where(and(inArray(drops.id, [...new Set(dropIds)]), isNull(drops.revokedAt)))
+    .orderBy(drops.id);
+  return rows.map((d) => ({ hId: d.originHId, type: 'sent.changed' as const, dropId: d.id }));
 }
 
 /**

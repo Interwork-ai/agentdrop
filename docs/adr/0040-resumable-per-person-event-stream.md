@@ -31,12 +31,17 @@ surface carries its own loop, and an agent cannot react while a person is away w
   `mailbox_events.id` is never a cursor: it is assigned before commit, so it does not follow commit order
   (SPEC §7.2).
 - **Events carry ids and a type, never content.** Types: `delivery.created`, `delivery.state`, `grant.revoked`,
-  `drop.revoked`, `attachment.removed`, and `directory.changed` when the person's `directory_revision` moves
-  (contacts, groups and their membership, roles, ownership, policies, invitations and join requests, names, and
-  the account-wide read setting). Titles, bodies and names are read through the existing endpoints, under the one
-  authorization predicate (AGENTS.md rule 4), so the stream never reveals more than a list; an event about a drop
-  goes only to agents that may still read it. The copies of one change that ADR 0007 writes for each of a person's
-  agents are written next to each other and coalesced within a batch.
+  `drop.revoked`, `attachment.removed`, `sent.changed` (see the amendment below), and `directory.changed` when the
+  person's `directory_revision` moves (contacts, groups and their membership, roles, ownership, policies,
+  invitations and join requests, names, and the account-wide read setting). Titles, bodies and names are read
+  through the existing endpoints, under the one authorization predicate (AGENTS.md rule 4), so no content reaches a
+  reader the predicate would refuse. The stream itself does not re-check each drop: it returns the events written
+  to the agents the caller may read from, and an event names only a type and a drop id. Some go to agents that can
+  no longer open that drop (`drop.revoked` goes to every agent that held it, and `grant.revoked` to the agent that
+  lost it); such a reader learns only that something about an id it was already given changed, and reading the drop
+  answers `NOT_FOUND` as anywhere else. `attachment.removed` goes only to agents with a valid grant. The copies of
+  one change that ADR 0007 writes for each of a person's agents are written next to each other and coalesced
+  within a batch.
 - **Wake-up without new infrastructure.** The writing transaction calls `pg_notify('agentdrop_events', user_id)`
   once per affected person; PostgreSQL delivers it on commit. Each API process listens on one connection (TCP
   keepalive and a periodic check reconnect it when it dies silently) and wakes its waiting requests; every waiter
@@ -67,3 +72,23 @@ process for LISTEN, which must be a direct or session-mode connection (a transac
 never delivers). `pg_notify` inside the writing transaction takes a
 cluster-wide lock at commit, so notifying commits are serialized; that is accepted at this product's write volume.
 A later per-person log can replace the vector cursor without changing any client, because the cursor is opaque.
+
+## Amendment (2026-10-26): the author's side
+
+As first accepted, events reached only the agents holding a delivery, so a person's own send (from an agent, the CLI
+or a held send approved later) and every change to its read receipts reached their dashboard only through the 10 s
+refetch, contrary to "the dashboard reacts within a second". The author's agents now get events too:
+
+- **`sent.changed`** names a drop the person sent. It is written when the drop is committed (also a held send once
+  approved) and whenever the author's receipt for one recipient moves: that person first opens or reads it (the
+  open of the body, marking it read, or the read implied by their own reply or group post, ADR 0016), or marks it
+  unread again before ever opening it. Starring and archiving by a recipient announce nothing.
+- It is written to the drop's sending agent only. That is exactly whom the authorization predicate lets read the
+  drop as its sender: the sending agent, and with account-wide reads every agent of the author, whose streams
+  include the sending agent's events. An agent narrowed to itself does not hear of another agent's sends.
+- It carries the drop id and the type, never which recipient, agent or device caused it (ADR 0013): the row's
+  agent is the author's own, its delivery id is empty and its payload is `{}`. Who read the drop is read, as
+  before, through the drop's receipts.
+- New types are added this way, additively: a reader ignores a type it does not know. The dashboard refetches its
+  sent view and open drops on `sent.changed`, and treats any other unknown type as a mailbox change;
+  `ApiClient.events` passes types through without validating them.

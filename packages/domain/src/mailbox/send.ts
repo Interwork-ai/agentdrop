@@ -342,7 +342,10 @@ export async function commitDrop(
   // deliveries so mailbox heads are locked once, in order.
   const caughtUp = await dropsAnsweredBy(tx, scope.userId, envelope, resolved, drop);
   const stateEvents = await markReadForPerson(tx, scope.userId, caughtUp);
-  await bumpMailboxes(tx, [...events, ...stateEvents]);
+  // The author's own streams learn of the new drop too (ADR 0040), so a sent view open elsewhere (another agent's
+  // send, a held send approved later) shows it at once: written to the sending agent, as for any receipt.
+  const sent = { hId: scope.hId, type: 'sent.changed' as const, dropId: drop.id };
+  await bumpMailboxes(tx, [...events, sent, ...stateEvents]);
   const recipientUserIds = [
     ...new Set(
       (
@@ -373,7 +376,12 @@ export async function commitDrop(
       outcome: 'delivered',
       endpoints: resolved.endpoints.size,
       body_chars: drop.bodyChars,
-      ...(stateEvents.length ? { marked_read: new Set(stateEvents.map((e) => e.dropId)).size } : {}),
+      ...(stateEvents.length
+        ? {
+            marked_read: new Set(stateEvents.filter((e) => e.type === 'delivery.state').map((e) => e.dropId))
+              .size,
+          }
+        : {}),
     },
   });
   return {

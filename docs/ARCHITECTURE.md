@@ -241,7 +241,8 @@ reachable by a human at a terminal or through the dashboard session.
   per-agent revisions, `directory_revision`, a tag binding it to person and scope). Each agent is read through the
   `(h_id, revision)` index and the rows merged by id; a gap in an agent's revisions (retention), a cursor ahead of
   the server or one from another scope is `RESYNC_REQUIRED`. `bumpMailboxes` writes events in input order, so the
-  copies of one change for a person's agents are adjacent and coalesce. Events carry ids and types only. The
+  copies of one change for a person's agents are adjacent and coalesce. Events carry ids and types only; the
+  author's sending agent gets `sent.changed` when the drop is committed and when a recipient's receipt moves. The
   writing transaction calls `pg_notify` once per affected person; each API process holds one LISTEN connection
   (`EventHub`, `apps/api/src/events.ts`; TCP keepalive and a `SELECT 1` every 30 s reconnect a silently dropped
   one), and a missed wake-up costs at most one wait period. An open stream re-runs the credential or session check

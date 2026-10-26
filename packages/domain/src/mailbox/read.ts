@@ -45,6 +45,7 @@ import {
   visibleEndpointIds,
 } from './authorization.js';
 import { privateRecipientsMany } from './recipient-privacy.js';
+import { bumpMailboxes, sentChangedEvents } from './revision.js';
 
 interface Cursor {
   t: string;
@@ -1142,27 +1143,38 @@ export async function readDrop(
 
 /**
  * First open by a recipient, account-wide: every delivery of this drop to any of the reader's agents. Only
- * `opened_at` changes — `read_at`, `state_version`, unread counts and mailbox revisions stay as they were, so
- * the reader's own mailbox still shows it unread until they mark it. Reading as the author or as a group admin
- * (no delivery-based source) never gets here.
+ * `opened_at` changes — `read_at`, `state_version`, unread counts and the reader's mailbox revisions stay as they
+ * were, so the reader's own mailbox still shows it unread until they mark it. Reading as the author or as a group
+ * admin (no delivery-based source) never gets here. When this is the first the author's receipt hears of this person
+ * (no copy opened or read before), the author's streams get `sent.changed` (ADR 0040), naming only the drop.
  */
 async function markOpened(tx: Tx, userId: string, dropId: string): Promise<void> {
-  await tx
+  const ofReader = and(
+    eq(deliveries.dropId, dropId),
+    inArray(
+      deliveries.hId,
+      tx
+        .select({ id: harnessEndpoints.id })
+        .from(harnessEndpoints)
+        .where(eq(harnessEndpoints.userId, userId)),
+    ),
+  );
+  const opened = await tx
     .update(deliveries)
     .set({ openedAt: sql`now()` })
-    .where(
-      and(
-        eq(deliveries.dropId, dropId),
-        isNull(deliveries.openedAt),
-        inArray(
-          deliveries.hId,
-          tx
-            .select({ id: harnessEndpoints.id })
-            .from(harnessEndpoints)
-            .where(eq(harnessEndpoints.userId, userId)),
-        ),
-      ),
-    );
+    .where(and(ofReader, isNull(deliveries.openedAt)))
+    .returning({ id: deliveries.id });
+  if (opened.length === 0) return;
+  // Copies not opened just now were opened before; a read copy already counted. Either way the receipt stays.
+  const [copies] = await tx
+    .select({
+      all: sql<number>`count(*)::int`,
+      read: sql<number>`(count(*) filter (where ${deliveries.readAt} is not null))::int`,
+    })
+    .from(deliveries)
+    .where(ofReader);
+  if (copies && copies.all === opened.length && copies.read === 0)
+    await bumpMailboxes(tx, await sentChangedEvents(tx, [dropId]));
 }
 
 export function toAttachmentMeta(a: typeof attachments.$inferSelect): AttachmentMeta {

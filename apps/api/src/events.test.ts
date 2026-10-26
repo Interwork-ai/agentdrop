@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import { sweepMailboxEvents } from '@agentdrop/domain';
-import { sql } from 'drizzle-orm';
+import { approvals, drops } from '@agentdrop/db';
+import { sendDrop, sweepMailboxEvents } from '@agentdrop/domain';
+import { eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   type BrowserUser,
@@ -107,6 +108,141 @@ describeDb('the per-person event stream (ADR 0040)', () => {
       { type: 'delivery.state', drop_id: dropId },
     ]);
     expect((await events(carolH, { cursor: carolCursor })).json().events).toEqual([]);
+  });
+
+  describe("the author's side: sent.changed", () => {
+    const sentEvent = (dropId: string) => ({ type: 'sent.changed', drop_id: dropId });
+    const open = (h: PairedEndpoint, dropId: string) =>
+      t.app.inject({ method: 'GET', url: `/v1/h/drops/${dropId}`, headers: hHeaders(h.credential) });
+    const setState = (h: PairedEndpoint, dropId: string, body: Record<string, unknown>) =>
+      t.app.inject({
+        method: 'PATCH',
+        url: `/v1/h/drops/${dropId}/state`,
+        headers: hHeaders(h.credential),
+        payload: body,
+      });
+    /** Everything that would tell the author which of Bob's agents, or which person, caused an event. */
+    const bobIdentity = () => [bob.userId, bob.handle, bobCodex.hId, bobClaude.hId];
+
+    it('tells the author of their own send and of the first open, never naming who opened it', async () => {
+      const aliceCursor = await subscribe(aliceH);
+      const carolCursor = await subscribe(carolH);
+      const dropId = await send(aliceH, bob);
+      const sent = await events(aliceH, { cursor: aliceCursor });
+      expect(sent.json().events).toEqual([sentEvent(dropId)]);
+
+      expect((await open(bobCodex, dropId)).statusCode).toBe(200);
+      const opened = await events(aliceH, { cursor: sent.json().cursor });
+      expect(opened.json().events).toEqual([sentEvent(dropId)]);
+      for (const id of bobIdentity()) expect(opened.body).not.toContain(id);
+      // what is stored is the drop id on the author's own agent, nothing of the reader's
+      const { rows } = await t.db.pool.query(
+        "select h_id, delivery_id, payload from mailbox_events where type = 'sent.changed' and drop_id = $1",
+        [dropId],
+      );
+      expect(rows).toEqual([
+        { h_id: aliceH.hId, delivery_id: null, payload: {} },
+        { h_id: aliceH.hId, delivery_id: null, payload: {} },
+      ]);
+
+      // opening it again from another agent of Bob's, or marking it read now, leaves the receipt as it was
+      expect((await open(bobClaude, dropId)).statusCode).toBe(200);
+      expect((await setState(bobCodex, dropId, { expected_version: 0, read: true })).statusCode).toBe(200);
+      expect((await events(aliceH, { cursor: opened.json().cursor })).json().events).toEqual([]);
+      expect((await events(carolH, { cursor: carolCursor })).json().events).toEqual([]);
+    });
+
+    it('tells the author when the receipt moves, and not when the recipient stars or archives', async () => {
+      const dropId = await send(aliceH, bob);
+      const cursor = await subscribe(aliceH);
+      expect((await setState(bobCodex, dropId, { expected_version: 0, starred: true })).statusCode).toBe(200);
+      expect((await setState(bobClaude, dropId, { expected_version: 1, archived: true })).statusCode).toBe(
+        200,
+      );
+      const quiet = await events(aliceH, { cursor });
+      expect(quiet.json().events).toEqual([]);
+
+      expect((await setState(bobCodex, dropId, { expected_version: 2, read: true })).statusCode).toBe(200);
+      const read = await events(aliceH, { cursor: quiet.json().cursor });
+      expect(read.json().events).toEqual([sentEvent(dropId)]);
+      for (const id of bobIdentity()) expect(read.body).not.toContain(id);
+      // marked unread again before ever opening it: the receipt goes back to unread
+      expect((await setState(bobCodex, dropId, { expected_version: 3, read: false })).statusCode).toBe(200);
+      expect((await events(aliceH, { cursor: read.json().cursor })).json().events).toEqual([
+        sentEvent(dropId),
+      ]);
+    });
+
+    it('tells the author when a reply marks their drop read for the recipient', async () => {
+      const dropId = await send(aliceH, bob);
+      const cursor = await subscribe(aliceH);
+      const reply = await t.app.inject({
+        method: 'POST',
+        url: '/v1/h/drops',
+        headers: hHeaders(bobCodex.credential),
+        payload: {
+          request_id: `events-${randomUUID()}`,
+          targets: [{ type: 'user', user_id: alice.userId }],
+          payload: {
+            payload_version: 1,
+            title: 'done',
+            body: 'the ablation run finished',
+            attachment_ids: [],
+            extensions: {},
+            reply_to: dropId,
+          },
+        },
+      });
+      expect(reply.statusCode, reply.body).toBe(200);
+      expect((await events(aliceH, { cursor })).json().events).toEqual(
+        expect.arrayContaining([
+          sentEvent(dropId),
+          { type: 'delivery.created', drop_id: reply.json().drop_id },
+        ]),
+      );
+    });
+
+    it("reaches the author's other agents exactly as account-wide reads let them read the drop", async () => {
+      const aliceClaude = await pair(t, alice, { harness: 'claude-code' });
+      const accountWide = await subscribe(aliceClaude);
+      const narrowed = (await events(aliceClaude, { endpoint_scope: 'current' })).json().cursor;
+      const dropId = await send(aliceH, bob);
+      expect((await events(aliceClaude, { cursor: accountWide })).json().events).toEqual([sentEvent(dropId)]);
+      expect(
+        (await events(aliceClaude, { cursor: narrowed, endpoint_scope: 'current' })).json().events,
+      ).toEqual([]);
+    });
+
+    it('tells the author when a held send is approved and committed', async () => {
+      const envelope = {
+        request_id: `events-${randomUUID()}`,
+        targets: [{ type: 'user' as const, user_id: bob.userId }],
+        payload: { payload_version: 1, title: 'held', body: 'body', attachment_ids: [], extensions: {} },
+      };
+      const held = await t.db.drizzle.transaction((tx) =>
+        sendDrop(tx, { userId: alice.userId, hId: aliceH.hId, via: 'h_credential' }, envelope, {
+          originKind: 'mcp',
+          maxGroupRecipients: 3,
+          approvalPolicy: async () => ({ needsApproval: true, reasons: ['review'] }),
+        }),
+      );
+      expect(held.outcome).toBe('needs_approval');
+      const cursor = await subscribe(aliceH);
+      const approval = await t.db.drizzle.query.approvals.findFirst({
+        where: eq(approvals.requestId, envelope.request_id),
+      });
+      if (!approval) throw new Error('missing approval');
+      const decided = await t.app.inject({
+        method: 'POST',
+        url: `/v1/me/approvals/${approval.id}/decide`,
+        headers: { cookie: alice.cookie, origin: t.origin },
+        payload: { decision: 'approve' },
+      });
+      expect(decided.statusCode, decided.body).toBe(200);
+      const drop = await t.db.drizzle.query.drops.findFirst({ where: eq(drops.authorUserId, alice.userId) });
+      if (!drop) throw new Error('nothing committed');
+      expect((await events(aliceH, { cursor })).json().events).toEqual([sentEvent(drop.id)]);
+    });
   });
 
   it('answers a long-poll as soon as something arrives', async () => {

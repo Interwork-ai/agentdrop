@@ -13,13 +13,19 @@ export const EVENT_TYPES = [
   'attachment.removed',
   /** The person's contacts, groups, invitations or names changed: refetch pending_requests or the directory. */
   'directory.changed',
+  /**
+   * A drop the person sent: just committed (including a held send once approved), or who has read it changed (its
+   * receipts). Refetch the sent view and that drop's receipts. Never says which recipient or agent (ADR 0013).
+   * Added after the first release of the stream: a reader ignores a type it does not know.
+   */
+  'sent.changed',
 ] as const;
 export const eventTypeSchema = z.enum(EVENT_TYPES);
 export type EventType = z.infer<typeof eventTypeSchema>;
 
 export const streamEventSchema = z.object({
   type: eventTypeSchema,
-  /** The drop the event is about; null for `directory.changed`. */
+  /** The drop the event is about; null for `directory.changed`. Readers ignore types they do not know. */
   drop_id: z.uuid().nullable(),
 });
 export type StreamEvent = z.infer<typeof streamEventSchema>;

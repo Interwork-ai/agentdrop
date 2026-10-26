@@ -6058,7 +6058,8 @@
                               "grant.revoked",
                               "drop.revoked",
                               "attachment.removed",
-                              "directory.changed"
+                              "directory.changed",
+                              "sent.changed"
                             ]
                           },
                           "drop_id": {
