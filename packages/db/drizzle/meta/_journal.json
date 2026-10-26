@@ -260,6 +260,13 @@
       "when": 1792908893268,
       "tag": "0036_rate_limits",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1793007553546,
+      "tag": "0037_rate_limits_reset_at",
+      "breakpoints": true
     }
   ]
 }

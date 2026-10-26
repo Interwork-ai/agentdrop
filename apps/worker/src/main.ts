@@ -155,8 +155,15 @@ async function maintenance(): Promise<void> {
     if (n < EVENT_SWEEP_BATCH) break;
   }
   if (finished) log.info({ count: finished }, 'swept finished outbox events');
-  // rate-limit windows that ended over an hour ago; a later request would reuse the row anyway
-  await withTx(db, (tx) => sweepRateLimits(tx, new Date(Date.now() - 3_600_000)));
+  // rate-limit windows that ended over an hour ago (a later request would reuse the row anyway), at most 20 batches
+  const limitsBefore = new Date(Date.now() - 3_600_000);
+  let windows = 0;
+  for (let pass = 0; pass < 20; pass++) {
+    const n = await withTx(db, (tx) => sweepRateLimits(tx, limitsBefore, RATE_LIMIT_SWEEP_BATCH));
+    windows += n;
+    if (n < RATE_LIMIT_SWEEP_BATCH) break;
+  }
+  if (windows) log.info({ count: windows }, 'swept ended rate-limit windows');
   if (
     cliLatest &&
     config.UPDATE_REMINDER_DAYS.length > 0 &&
@@ -176,6 +183,7 @@ async function maintenance(): Promise<void> {
 
 let lastReminderSweep = 0;
 const EVENT_SWEEP_BATCH = 5000;
+const RATE_LIMIT_SWEEP_BATCH = 5000;
 /** The CLI version this build ships (apps/cli/package.json next to this app), unless configured. */
 const cliLatest = config.CLI_LATEST_VERSION ?? shippedCliVersion();
 function shippedCliVersion(): string | undefined {

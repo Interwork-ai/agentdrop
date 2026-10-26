@@ -344,20 +344,26 @@ export const recipientRoutes = pgTable(
 );
 
 /**
+ * Fixed-window rate limits shared by every API process (pairing, password reset, recovery, export, invite previews
+ * and per-minute search; sign-in stays with Better Auth's per-process limit): one row per key and window, counted
+ * atomically, so a limit holds however many processes serve and survives a restart. `key` is a keyed hash of the
+ * limiter's name and raw key, never an email or address. Rows past their window are reused by the next request or
+ * swept by the worker through the `reset_at` index.
+ */
+export const rateLimits = pgTable(
+  'rate_limits',
+  {
+    key: text('key').primaryKey(),
+    count: integer('count').notNull(),
+    resetAt: ts('reset_at').notNull(),
+  },
+  (t) => [index('rate_limits_reset_at_idx').on(t.resetAt)],
+);
+
+/**
  * Runtime settings an admin can change without a redeploy (currently the sign-up mode). One row per key; the
  * value is a small JSON document so a setting can grow fields without a migration.
  */
-/**
- * Fixed-window rate limits shared by every API process (sign-in, pairing, password reset, recovery, export,
- * contacts): one row per key and window, counted atomically, so a limit holds however many processes serve and
- * survives a restart. Rows past their window are reused by the next request or swept by the worker.
- */
-export const rateLimits = pgTable('rate_limits', {
-  key: text('key').primaryKey(),
-  count: integer('count').notNull(),
-  resetAt: ts('reset_at').notNull(),
-});
-
 export const appSettings = pgTable('app_settings', {
   key: text('key').primaryKey(),
   value: jsonb('value').notNull(),
