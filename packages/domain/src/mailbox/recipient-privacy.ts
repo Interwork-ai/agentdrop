@@ -56,7 +56,7 @@ export async function privateRecipientsMany(
   // Who other than the viewer each group reached: from the drop's deliveries, or an approval's frozen endpoints.
   const withGroups = parsed.filter((p) => p.recipients?.some((r) => r.type === 'group'));
   const dropIds = [...new Set(withGroups.map((p) => p.dropId).filter((id): id is string => Boolean(id)))];
-  const deliveredTo = dropIds.length
+  const deliveredRows = dropIds.length
     ? await tx
         .select({
           dropId: deliveries.dropId,
@@ -68,6 +68,13 @@ export async function privateRecipientsMany(
         .innerJoin(deliveryGrants, eq(deliveryGrants.deliveryId, deliveries.id))
         .where(inArray(deliveries.dropId, dropIds))
     : [];
+  // grouped by drop, so rendering a page reads each delivery once instead of once per drop
+  const deliveredTo = new Map<string, Array<{ userId: string; groupId: string | null }>>();
+  for (const row of deliveredRows) {
+    const list = deliveredTo.get(row.dropId) ?? [];
+    list.push(row);
+    deliveredTo.set(row.dropId, list);
+  }
   const frozenHIds = [
     ...new Set(
       withGroups.filter((p) => !p.dropId).flatMap((p) => (p.snapshot.endpoints ?? []).map(([hId]) => hId)),
@@ -121,7 +128,7 @@ export async function privateRecipientsMany(
       groupPeople.set(groupId, members);
     };
     if (p.dropId) {
-      for (const row of deliveredTo) if (row.dropId === p.dropId) add(row.groupId, row.userId);
+      for (const row of deliveredTo.get(p.dropId) ?? []) add(row.groupId, row.userId);
     } else {
       for (const [hId, grants] of p.snapshot.endpoints ?? [])
         for (const g of grants) add(g.groupId, ownerOf.get(hId));

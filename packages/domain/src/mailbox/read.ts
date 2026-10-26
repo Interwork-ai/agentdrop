@@ -11,6 +11,7 @@ import {
   type RecipientStatus,
   type RepliesInfo,
   type ReplyRef,
+  type ResolvedRecipient,
   resolvedRecipientSchema,
 } from '@agentdrop/contracts';
 import {
@@ -704,10 +705,7 @@ async function presentationsForDrops(
     .from(harnessEndpoints)
     .where(and(inArray(harnessEndpoints.id, originIds), eq(harnessEndpoints.userId, scope.userId)));
   const originById = new Map(ownOrigins.map((origin) => [origin.id, origin]));
-  const receipts = await receiptsForDrops(tx, scope.userId, dropRows);
-  const replyRefs = await replyRefsForDrops(tx, dropRows, visibleHIds, viewer);
-  const replies = await repliesForDrops(tx, scope.userId, dropRows, visibleHIds, viewer);
-  // the author's own drops list who they went to, rendered for the whole page at once
+  // the author's own drops list who they went to, rendered for the whole page at once and shared with the receipts
   const authored = dropRows.filter((drop) => drop.authorUserId === scope.userId);
   const rendered = await privateRecipientsMany(
     tx,
@@ -719,6 +717,9 @@ async function presentationsForDrops(
     })),
   );
   const recipientsOf = new Map(authored.map((drop, i) => [drop.id, rendered[i] ?? []]));
+  const receipts = await receiptsForDrops(tx, scope.userId, authored, recipientsOf);
+  const replyRefs = await replyRefsForDrops(tx, dropRows, visibleHIds, viewer);
+  const replies = await repliesForDrops(tx, scope.userId, dropRows, visibleHIds, viewer);
 
   for (const drop of dropRows) {
     const ownOrigin = originById.get(drop.originHId);
@@ -911,15 +912,17 @@ async function repliesForDrops(
  * Read receipts for the drops the viewer wrote, one entry per frozen recipient. A person counts as having read a
  * drop once any of their deliveries was opened (`opened_at`) or marked read (`read_at`). Everything is aggregated
  * per person: the author learns who read it, never which agent or device of theirs did.
- * One query for the whole page plus one for the people involved.
+ * One query for the whole page plus one for the people involved. `authored` are the viewer's own drops and
+ * `recipientsOf` their recipients as already rendered for the viewer (`privateRecipientsMany`), so a page renders them
+ * once.
  */
 async function receiptsForDrops(
   tx: Tx,
   viewerUserId: string,
-  dropRows: Array<typeof drops.$inferSelect>,
+  authored: Array<typeof drops.$inferSelect>,
+  recipientsOf: Map<string, ResolvedRecipient[]>,
 ): Promise<Map<string, RecipientStatus[]>> {
   const result = new Map<string, RecipientStatus[]>();
-  const authored = dropRows.filter((drop) => drop.authorUserId === viewerUserId);
   if (authored.length === 0) return result;
   const rows = await tx
     .select({
@@ -955,16 +958,7 @@ async function receiptsForDrops(
   const userById = new Map(users.map((user) => [user.id, user]));
   const iso = (date: Date | null) => (date ? new Date(date).toISOString() : null);
 
-  const rendered = await privateRecipientsMany(
-    tx,
-    viewerUserId,
-    authored.map((drop) => ({
-      raw: (drop.targetSnapshot as { recipients?: unknown } | null)?.recipients,
-      snapshot: drop.targetSnapshot,
-      dropId: drop.id,
-    })),
-  );
-  for (const [i, drop] of authored.entries()) {
+  for (const drop of authored) {
     const snapshot = drop.targetSnapshot as { recipients?: unknown; group_ids?: unknown } | null;
     if (!resolvedRecipientSchema.array().safeParse(snapshot?.recipients).success) continue;
     const groupIds = Array.isArray(snapshot?.group_ids)
@@ -974,7 +968,7 @@ async function receiptsForDrops(
       .filter((row) => row.dropId === drop.id)
       .map((row) => ({ ...row, user: userById.get(row.userId), groups: row.groupIds.split(',') }));
     let groupIndex = 0;
-    const visibleRecipients = rendered[i] ?? [];
+    const visibleRecipients = recipientsOf.get(drop.id) ?? [];
     const statuses: RecipientStatus[] = visibleRecipients.map((recipient) => {
       if (recipient.type === 'group') {
         // Group recipients and `group_ids` are appended together at send time, in the same order.
