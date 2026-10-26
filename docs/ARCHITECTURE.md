@@ -249,9 +249,14 @@ reachable by a human at a terminal or through the dashboard session.
   before each batch and at least every 25 s, pings when idle for 25 s, stops reading for a client that lags and
   cuts it off after 25 s, and ends after 15 minutes. The worker sweeps events past the retention window.
 - Dashboard: 10 s refetch while visible (60 s hidden); query keys include `h_id`; switching H drops the cache. The
-  visible tab also holds the person's event stream (`apps/web/src/lib/live.ts`) and refetches at once what a batch
-  makes stale (an open search and the composer's recipient list are only marked stale); a fresh stream refetches
-  everything once. The refetch interval does not depend on the stream, which only makes views quicker.
+  visible tab also holds the person's event stream (`apps/web/src/lib/live.ts`) and refetches what a batch makes
+  stale (an open search and the composer's recipient list are only marked stale); a fresh stream refetches
+  everything once. Batches arriving within 400 ms are merged into one refetch, group details and files are
+  refetched only for deliveries arriving or going and removed files, `sent.changed` refetches only the views that
+  show the person's own drops, and a query whose fetch started after the batch arrived (or, for the person's own
+  state, after this tab's mutation that caused it) is not fetched again. A refused stream is asked for its status
+  once: after 401, 403 or 404 the tab stops trying until the person returns to it. The refetch interval does not
+  depend on the stream, which only makes views quicker.
 - Worker: `outbox_events` claimed with `FOR UPDATE SKIP LOCKED` and a lease; exponential backoff; dead-letter after
   8 attempts; handlers are idempotent. Delivery never waits for it. Delivered and dead-lettered events are swept
   after the event retention window; a pending one never is.

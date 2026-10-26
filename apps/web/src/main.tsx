@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MutationCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { lazy, StrictMode, Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
@@ -8,6 +8,7 @@ import '@fontsource/ibm-plex-mono/400.css';
 import '@fontsource/ibm-plex-mono/500.css';
 import './index.css';
 import { syncLangForNotifications } from './lib/lang.js';
+import { noteOwnMutation } from './lib/live.js';
 import { SessionProvider } from './lib/session.js';
 import { AgentsPage } from './pages/agents.jsx';
 import { LoginPage, SignupPage } from './pages/auth.jsx';
@@ -42,6 +43,8 @@ function Admin({ section }: { section: 'overview' | 'users' | 'audit' | 'setting
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: true, staleTime: 2_000 } },
+  // Runs before each mutation's own onSuccess refetches: the event stream then knows its echo (lib/live.ts).
+  mutationCache: new MutationCache({ onSuccess: () => noteOwnMutation() }),
 });
 
 syncLangForNotifications();
