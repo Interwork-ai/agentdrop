@@ -28,10 +28,20 @@ Releases up to 0.4.12 predate this file.
   contact request or group change), through the event stream of the visible tab; its 10-second background refresh
   stays as it was.
 
-- Database: an index on `mailbox_events.created_at` and the `rate_limits` table (expand-only migrations 0035 and
-  0036). 0035 is a plain `CREATE INDEX` on
-  `mailbox_events`, which has never been swept before: it blocks sends and state changes while it builds, so plan a
-  migration window on a server with a long history.
+- Database: an index on `mailbox_events.created_at`, the `rate_limits` table and an index on its `reset_at`
+  (expand-only migrations 0035–0037). 0035 is `CREATE INDEX IF NOT EXISTS`: on a server with a long history, build
+  the index first with `CREATE INDEX CONCURRENTLY IF NOT EXISTS "mailbox_events_created_idx" ON "mailbox_events"
+  USING btree ("created_at")` (docs/DEPLOY.md), and the migration then does nothing, so sends are never blocked.
+
+- The dashboard merges event-stream batches that arrive within 400 ms into one refetch, refetches group details and
+  files only when deliveries or files change, does not repeat a refetch its own action just caused, and stops
+  reconnecting after 401/403/404 until the person comes back to the tab.
+
+- `rate_limits` keeps a keyed hash of each key (HMAC-SHA256 under a key derived from `AUTH_SECRET`) instead of raw
+  emails and client addresses, and the worker sweeps ended windows in batches until done. Every API process needs
+  the same `AUTH_SECRET` to share limits; changing it starts every window afresh.
+
+- A list page renders its recipients once for both the recipient list and the read receipts.
 
 - README introductions focus on agent-to-agent collaboration, with prominent Codex notices and Claude Code mod
   integration, and six benefit-led features.
@@ -85,6 +95,13 @@ Releases up to 0.4.12 predate this file.
 
 ### Fixed
 
+- The dashboard's Sent view and an open drop's read receipts update within about a second when the person sends
+  from an agent, the CLI or an approved held send, and when a recipient opens or reads the drop (event type
+  `sent.changed`, which names only the drop, never who read it).
+- The per-process limit of two searches at a time holds under parallel requests; it was checked before the shared
+  per-minute limit was awaited, so every request arriving meanwhile got through.
+- A password-reset or recovery-code request with an over-long email answers 400 `VALIDATION_FAILED` instead of 500.
+- The worker's event retention sweep reads `mailbox_events_created_idx` in order instead of sorting by id.
 - The worker now deletes delivered and dead-lettered outbox events after the retention window
   (`MAILBOX_EVENTS_RETENTION_DAYS`); they were kept forever. Events still waiting are never deleted.
 
