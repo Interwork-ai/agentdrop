@@ -205,35 +205,38 @@ describeDb('the per-person event stream (ADR 0040)', () => {
 });
 
 describeDb('shutting down with open event streams', () => {
-  it('ends open SSE streams and waiting long-polls, so the server closes at once', async () => {
-    const t = await createTestApp();
-    try {
-      await t.reset();
-      const dana = await signUp(t, 'dana', 'Dana');
-      const danaH = await pair(t, dana, { harness: 'codex' });
-      await t.app.listen({ port: 0, host: '127.0.0.1' });
-      const address = t.app.server.address();
-      const base = `http://127.0.0.1:${typeof address === 'object' && address ? address.port : 0}`;
-      const stream = await fetch(`${base}/v1/h/events`, {
-        headers: { ...hHeaders(danaH.credential), accept: 'text/event-stream' },
-      });
-      if (!stream.body) throw new Error('no body');
-      const reader = stream.body.getReader();
-      const first = new TextDecoder().decode((await reader.read()).value);
-      const cursor = /^id: (\S+)\n/.exec(first)?.[1];
-      if (!cursor) throw new Error(`no cursor in ${first}`);
-      const longPoll = fetch(`${base}/v1/h/events?wait=25&cursor=${encodeURIComponent(cursor)}`, {
-        headers: hHeaders(danaH.credential),
-      });
-      await new Promise((resolve) => setTimeout(resolve, 200));
+  // A fresh app, since the test closes it; created in the hook so waiting for the shared test database lock counts
+  // against the hook's longer timeout, never against the test's.
+  let t: TestApp;
+  beforeAll(async () => {
+    t = await createTestApp();
+  });
+  afterAll(async () => t.close());
 
-      const started = Date.now();
-      await t.app.close();
-      expect(Date.now() - started).toBeLessThan(5000);
-      for (;;) if ((await reader.read()).done) break;
-      expect((await longPoll).status).toBe(200);
-    } finally {
-      await t.close();
-    }
+  it('ends open SSE streams and waiting long-polls, so the server closes at once', async () => {
+    await t.reset();
+    const dana = await signUp(t, 'dana', 'Dana');
+    const danaH = await pair(t, dana, { harness: 'codex' });
+    await t.app.listen({ port: 0, host: '127.0.0.1' });
+    const address = t.app.server.address();
+    const base = `http://127.0.0.1:${typeof address === 'object' && address ? address.port : 0}`;
+    const stream = await fetch(`${base}/v1/h/events`, {
+      headers: { ...hHeaders(danaH.credential), accept: 'text/event-stream' },
+    });
+    if (!stream.body) throw new Error('no body');
+    const reader = stream.body.getReader();
+    const first = new TextDecoder().decode((await reader.read()).value);
+    const cursor = /^id: (\S+)\n/.exec(first)?.[1];
+    if (!cursor) throw new Error(`no cursor in ${first}`);
+    const longPoll = fetch(`${base}/v1/h/events?wait=25&cursor=${encodeURIComponent(cursor)}`, {
+      headers: hHeaders(danaH.credential),
+    });
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    const started = Date.now();
+    await t.app.close();
+    expect(Date.now() - started).toBeLessThan(5000);
+    for (;;) if ((await reader.read()).done) break;
+    expect((await longPoll).status).toBe(200);
   });
 });

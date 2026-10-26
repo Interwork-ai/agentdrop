@@ -310,6 +310,14 @@ describeDb('the event stream as a long-lived request', () => {
 });
 
 describeDb('the LISTEN connection', () => {
+  // Created before the tests: waiting for the shared test database lock counts against a hook's longer timeout,
+  // never against a test's.
+  let t: TestApp;
+  beforeAll(async () => {
+    t = await createTestApp();
+  });
+  afterAll(async () => t.close());
+
   it('reconnects after its backend is terminated, and delivers what comes after', async () => {
     const url = TEST_DATABASE_URL as string;
     const channel = `agentdrop_listen_test_${randomUUID().slice(0, 8)}`;
@@ -320,7 +328,6 @@ describeDb('the LISTEN connection', () => {
         reconnects += 1;
       },
     });
-    const t = await createTestApp();
     try {
       for (let i = 0; i < 50 && reconnects === 0; i++) await sleep(50);
       expect(reconnects).toBe(1);
@@ -336,7 +343,6 @@ describeDb('the LISTEN connection', () => {
       expect(got).toContain('after');
     } finally {
       await listener.close();
-      await t.close();
     }
   });
 
