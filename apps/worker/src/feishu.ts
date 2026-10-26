@@ -1,4 +1,4 @@
-import { type Database, withTx } from '@agentdrop/db';
+import { type Database, loggableErrorText, withTx } from '@agentdrop/db';
 import {
   claimNoticeItem,
   type FeishuAppConfig,
@@ -125,7 +125,7 @@ export async function sendFeishuNotices(
     } catch (error) {
       await release();
       if (context.signal.aborted) throw new Error('LEASE_LOST');
-      const reason = error instanceof Error ? error.message : String(error);
+      const reason = loggableErrorText(error);
       log?.warn({ ...fields, error: reason, outcome: 'retry' }, 'feishu unreachable; will retry');
       failures.push(`${target.userId}: ${reason}`);
     }

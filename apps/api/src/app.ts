@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { loggableError, loggableErrorText } from '@agentdrop/db';
 import { configureGroupStorageQuota } from '@agentdrop/domain';
 import compress from '@fastify/compress';
 import cookie from '@fastify/cookie';
@@ -63,12 +64,17 @@ const redactingReqSerializer = {
   }),
 };
 
-function withRedaction(logger: boolean | object): boolean | object {
+export function withRedaction(logger: boolean | object): boolean | object {
   if (logger === false) return false;
   const base = logger === true ? {} : logger;
   return {
     ...base,
-    serializers: { ...(base as { serializers?: object }).serializers, ...redactingReqSerializer },
+    // a failed query's message carries its parameters: errors are logged through loggableError (AGENTS.md rule 7)
+    serializers: {
+      ...(base as { serializers?: object }).serializers,
+      ...redactingReqSerializer,
+      err: loggableError,
+    },
   };
 }
 
@@ -81,7 +87,7 @@ export async function buildApp(baseCtx: AppContext, opts: BuildAppOptions = {}):
     events:
       baseCtx.events ??
       new EventHub(baseCtx.config.DATABASE_URL, (err) =>
-        log?.warn({ err: err instanceof Error ? err.message : String(err) }, 'event listener error'),
+        log?.warn({ err: loggableErrorText(err) }, 'event listener error'),
       ),
   };
   const app = Fastify({

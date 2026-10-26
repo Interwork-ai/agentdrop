@@ -1,4 +1,4 @@
-import { type Database, withTx } from '@agentdrop/db';
+import { type Database, loggableErrorText, withTx } from '@agentdrop/db';
 import {
   applyFeishuCardPress,
   type FeishuAppConfig,
@@ -198,7 +198,7 @@ export function startFeishuEvents(deps: FeishuEventDeps): () => void {
         try {
           await onFeishuMessage(deps, data as MessageEvent);
         } catch (err) {
-          deps.log.warn({ error: err instanceof Error ? err.message : String(err) }, 'feishu message failed');
+          deps.log.warn({ error: loggableErrorText(err) }, 'feishu message failed');
         }
       },
       'card.action.trigger': async (data: unknown) => {
@@ -207,10 +207,7 @@ export function startFeishuEvents(deps: FeishuEventDeps): () => void {
         try {
           return await onFeishuCardPress(deps, event);
         } catch (err) {
-          deps.log.warn(
-            { error: err instanceof Error ? err.message : String(err) },
-            'feishu card press failed',
-          );
+          deps.log.warn({ error: loggableErrorText(err) }, 'feishu card press failed');
           return {};
         }
       },

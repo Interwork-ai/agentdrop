@@ -103,6 +103,9 @@ Releases up to 0.4.12 predate this file.
 
 ### Security
 
+- Logs no longer carry the parameters of a failed database query or a PostgreSQL message quoting a value: the API
+  and the worker log errors through `loggableError` (PostgreSQL's code, constraint and table only), so an email or
+  title bound into a query never reaches a log line.
 - Dependencies with published advisories are updated: zod 4.6.7, fastify 5.12.7 (and fast-uri through it),
   nodemailer 10.2.1, undici 8.12.3 in the CLI, and source-map-js in the dashboard build; drizzle-kit's
   @esbuild-kit loader now gets esbuild 0.25.12 through a pnpm override. `pnpm audit` reports nothing.

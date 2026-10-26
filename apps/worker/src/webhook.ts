@@ -1,7 +1,7 @@
 import { lookup as dnsLookup, type LookupAddress } from 'node:dns';
 import { request } from 'node:https';
 import { isIP, type LookupFunction } from 'node:net';
-import { appUsers, type DrizzleDb } from '@agentdrop/db';
+import { appUsers, type DrizzleDb, loggableErrorText } from '@agentdrop/db';
 import { isPublicUnicastAddress } from '@agentdrop/domain';
 import { inArray } from 'drizzle-orm';
 import type { DeliveryProgress } from './outbox.js';
@@ -153,7 +153,7 @@ export async function notifyUsers(
         await context.progress?.markDone(progressKey);
         continue;
       }
-      failures.push(`${u.id}: ${err instanceof Error ? err.message : String(err)}`);
+      failures.push(`${u.id}: ${loggableErrorText(err)}`);
     }
   }
   if (failures.length) throw new Error(`webhook delivery failed: ${failures.join('; ')}`);

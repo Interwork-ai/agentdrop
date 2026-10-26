@@ -11,7 +11,7 @@ import {
   type Viewer,
   z,
 } from '@agentdrop/contracts';
-import { appUsers, harnessEndpoints, withTx } from '@agentdrop/db';
+import { appUsers, harnessEndpoints, loggableErrorText, withTx } from '@agentdrop/db';
 import {
   deleteSpaceItem,
   directoryLookup,
@@ -517,7 +517,7 @@ async function streamEvents(
   } catch (err) {
     if (err instanceof AgentDropError && err.code === 'RESYNC_REQUIRED')
       write('event: resync\ndata: {"code":"RESYNC_REQUIRED"}\n\n');
-    else reply.log.warn({ err: err instanceof Error ? err.message : String(err) }, 'event stream ended');
+    else reply.log.warn({ err: loggableErrorText(err) }, 'event stream ended');
   } finally {
     // A stream ended by the server closing also gives up its keep-alive connection once the last bytes are out;
     // the server closes idle connections only when the close begins, and this one was busy then.

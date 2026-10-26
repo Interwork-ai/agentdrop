@@ -5,7 +5,7 @@
 
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
-import { connections, createDatabase, withTx } from '@agentdrop/db';
+import { connections, createDatabase, loggableError, withTx } from '@agentdrop/db';
 import {
   expireStagedAttachments,
   expireUnlinkedAttachments,
@@ -87,7 +87,8 @@ const config = z
   })
   .parse(process.env);
 
-const log = pino({ level: config.LOG_LEVEL });
+// a failed query's message carries its parameters: errors are logged through loggableError (AGENTS.md rule 7)
+const log = pino({ level: config.LOG_LEVEL, serializers: { err: loggableError } });
 const webPushConfig = loadWebPushConfig(process.env);
 configureWebPush(webPushConfig);
 const db = createDatabase(config.DATABASE_URL, { max: 3 });
