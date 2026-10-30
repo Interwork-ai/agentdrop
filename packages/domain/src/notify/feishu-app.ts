@@ -74,6 +74,8 @@ export interface FeishuApiResult {
   code: number;
   message: string;
   messageId?: string;
+  /** Feishu's `data` object, for reads. */
+  data?: Record<string, unknown>;
 }
 
 /** Codes that retrying will not fix: the person is outside the app's availability, blocked the bot, no bot, no scope. */
@@ -122,7 +124,7 @@ export function resetFeishuTokens(): void {
 async function callFeishu(
   config: FeishuAppConfig,
   path: string,
-  init: { method: 'POST' | 'PATCH'; body: unknown },
+  init: { method: 'GET' | 'POST' | 'PATCH'; body?: unknown },
   fetchImpl: typeof fetch,
   now: () => number,
 ): Promise<FeishuApiResult> {
@@ -131,7 +133,7 @@ async function callFeishu(
     const res = await fetchImpl(`${feishuOpenBase(config)}${path}`, {
       method: init.method,
       headers: { 'content-type': 'application/json; charset=utf-8', authorization: `Bearer ${token}` },
-      body: JSON.stringify(init.body),
+      ...(init.body === undefined ? {} : { body: JSON.stringify(init.body) }),
       redirect: 'error',
       signal: AbortSignal.timeout(10_000),
     });
@@ -142,12 +144,13 @@ async function callFeishu(
       tokens.delete(config.appId);
       continue;
     }
-    const data = (body.data ?? {}) as { message_id?: unknown };
+    const data = (body.data ?? {}) as Record<string, unknown>;
     return {
       ok: code === 0,
       code,
       message: String(body.msg ?? res.statusText).slice(0, 200),
       ...(typeof data.message_id === 'string' ? { messageId: data.message_id } : {}),
+      data,
     };
   }
   return { ok: false, code: -1, message: 'token refresh failed' };
@@ -188,6 +191,74 @@ export function updateFeishuCard(
     fetchImpl,
     now,
   );
+}
+
+/** Posts plain text into a group chat the app's bot is in (ADR 0041: what the bot does there). */
+export function sendFeishuChatText(
+  config: FeishuAppConfig,
+  chatId: string,
+  text: string,
+  fetchImpl: typeof fetch = fetch,
+  now: () => number = Date.now,
+): Promise<FeishuApiResult> {
+  return callFeishu(
+    config,
+    '/open-apis/im/v1/messages?receive_id_type=chat_id',
+    { method: 'POST', body: { receive_id: chatId, msg_type: 'text', content: JSON.stringify({ text }) } },
+    fetchImpl,
+    now,
+  );
+}
+
+/** A group's name as Feishu shows it, or null when the bot cannot read it (scope, not in the chat). */
+export async function feishuChatName(
+  config: FeishuAppConfig,
+  chatId: string,
+  fetchImpl: typeof fetch = fetch,
+  now: () => number = Date.now,
+): Promise<string | null> {
+  const res = await callFeishu(
+    config,
+    `/open-apis/im/v1/chats/${encodeURIComponent(chatId)}`,
+    { method: 'GET' },
+    fetchImpl,
+    now,
+  );
+  return res.ok && typeof res.data?.name === 'string' ? res.data.name : null;
+}
+
+/** People in a group chat as open_ids of this app (Feishu leaves bots out), or null when Feishu would not say. */
+export async function feishuChatMemberOpenIds(
+  config: FeishuAppConfig,
+  chatId: string,
+  fetchImpl: typeof fetch = fetch,
+  now: () => number = Date.now,
+): Promise<string[] | null> {
+  const ids: string[] = [];
+  let pageToken = '';
+  // a Feishu group holds at most 50,000 people; 100 pages of 100 is far beyond any group this is meant for
+  for (let page = 0; page < 100; page += 1) {
+    const query = `member_id_type=open_id&page_size=100${pageToken ? `&page_token=${encodeURIComponent(pageToken)}` : ''}`;
+    const res = await callFeishu(
+      config,
+      `/open-apis/im/v1/chats/${encodeURIComponent(chatId)}/members?${query}`,
+      { method: 'GET' },
+      fetchImpl,
+      now,
+    );
+    if (!res.ok) return null;
+    const items = Array.isArray(res.data?.items) ? (res.data.items as Array<{ member_id?: unknown }>) : [];
+    for (const item of items) if (typeof item.member_id === 'string') ids.push(item.member_id);
+    if (res.data?.has_more !== true || typeof res.data.page_token !== 'string') return ids;
+    pageToken = res.data.page_token;
+  }
+  return ids;
+}
+
+/** A link that opens a group chat in the Feishu client (AppLink "open a chat"). */
+export function feishuChatLink(config: Pick<FeishuAppConfig, 'domain'>, chatId: string): string {
+  const host = config.domain === 'lark' ? 'applink.larksuite.com' : 'applink.feishu.cn';
+  return `https://${host}/client/chat/open?openChatId=${encodeURIComponent(chatId)}`;
 }
 
 /* ------------------------------------------------------------------ cards */
@@ -447,6 +518,7 @@ export interface FeishuAppView {
   linked: boolean;
   bot_link: string | null;
   linked_at: string | null;
+  watch_terms: string[];
 }
 
 export async function feishuAppView(
@@ -454,13 +526,19 @@ export async function feishuAppView(
   userId: string,
   config: FeishuAppConfig | null,
 ): Promise<FeishuAppView> {
-  if (!config) return { available: false, linked: false, bot_link: null, linked_at: null };
+  const user = await tx.query.appUsers.findFirst({
+    where: eq(appUsers.id, userId),
+    columns: { feishuWatchTerms: true },
+  });
+  const watch_terms = user?.feishuWatchTerms ?? [];
+  if (!config) return { available: false, linked: false, bot_link: null, linked_at: null, watch_terms };
   const account = await getFeishuAccount(tx, userId, config.appId);
   return {
     available: true,
     linked: !!account,
     bot_link: feishuBotLink(config),
     linked_at: account ? account.createdAt.toISOString() : null,
+    watch_terms,
   };
 }
 

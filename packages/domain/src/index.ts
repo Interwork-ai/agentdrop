@@ -42,6 +42,7 @@ export * from './manage/manage.js';
 export * from './notify/feishu.js';
 export * from './notify/feishu-app.js';
 export * from './notify/feishu-settings.js';
+export * from './notify/feishu-updates.js';
 export * from './notify/update-reminders.js';
 export * from './principals.js';
 export * from './rate-limit.js';

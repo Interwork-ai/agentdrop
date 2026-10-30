@@ -179,11 +179,20 @@ async function settings(ctx, ann) {
     if (href !== 'https://applink.feishu.cn/client/bot/open?appId=cli_e2etestapp')
       throw new Error(`bot link is ${href}`);
   });
-  await step('nickname and email persist after a reload', async () => {
+  const watchTerms = () => page.locator('#feishu-watch').getByRole('textbox');
+  await step('Feishu group updates: save watch terms (ADR 0041)', async () => {
+    const card = page.locator('#feishu-watch');
+    await watchTerms().fill('apps/worker, PAPER-\napps/worker');
+    await card.getByRole('button', { name: 'Save watch terms' }).click();
+    await until('watch chip', async () => (await card.getByText('2 watched').count()) > 0, true);
+    await until('saved terms', () => watchTerms().inputValue(), 'apps/worker\nPAPER-');
+  });
+  await step('nickname, email and watch terms persist after a reload', async () => {
     await page.reload();
     await see('Language & theme');
     await until('nickname after reload', () => nickname().inputValue(), 'Ann Research');
     await until('public email after reload', () => email().inputValue(), 'ann.public@example.com');
+    await until('watch terms after reload', () => watchTerms().inputValue(), 'apps/worker\nPAPER-');
   });
   await step('switch to the light theme and Chinese', async () => {
     await radio('Theme', 'Light').click();

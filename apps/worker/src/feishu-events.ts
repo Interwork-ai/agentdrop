@@ -11,6 +11,13 @@ import {
 } from '@agentdrop/domain';
 import * as Lark from '@larksuiteoapi/node-sdk';
 import { dropNoticeItem } from './feishu-items.js';
+import {
+  FeishuChatCache,
+  type GroupMessageEvent,
+  inBackground,
+  onFeishuBotAdded,
+  onFeishuGroupMessage,
+} from './feishu-updates.js';
 import { resolveDropNotificationAudience } from './push.js';
 
 /*
@@ -22,6 +29,9 @@ import { resolveDropNotificationAudience } from './push.js';
  *
  * What a person types to the bot is matched against a code or the unlink words and then dropped: it is never
  * stored, never turned into a drop and never shown to a model.
+ *
+ * In a group the bot was added to, messages posted by other bots become update drops for the members who watch for
+ * them (ADR 0041, feishu-updates.ts); messages people write there are ignored.
  */
 
 export interface FeishuEventDeps {
@@ -192,14 +202,27 @@ export function startFeishuEvents(deps: FeishuEventDeps): () => void {
     loggerLevel: Lark.LoggerLevel.warn,
     logger: quiet,
   });
+  const chats = new FeishuChatCache();
   const dispatcher = new Lark.EventDispatcher({ loggerLevel: Lark.LoggerLevel.warn, logger: quiet }).register(
     {
       'im.message.receive_v1': async (data: unknown) => {
+        const group = data as GroupMessageEvent;
+        if (group.message?.chat_type === 'group') {
+          if (!firstTime(group.message.message_id)) return;
+          // members and names come from Feishu: answer the event first, then work
+          inBackground(deps, 'feishu update', () => onFeishuGroupMessage(deps, chats, group));
+          return;
+        }
         try {
           await onFeishuMessage(deps, data as MessageEvent);
         } catch (err) {
           deps.log.warn({ error: loggableErrorText(err) }, 'feishu message failed');
         }
+      },
+      'im.chat.member.bot.added_v1': async (data: unknown) => {
+        inBackground(deps, 'feishu bot added', () =>
+          onFeishuBotAdded(deps, chats, data as { chat_id?: string }),
+        );
       },
       'card.action.trigger': async (data: unknown) => {
         const event = data as CardEvent;

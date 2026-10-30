@@ -4,6 +4,7 @@ import {
   contactRequestInputSchema,
   contactRespondInputSchema,
   feishuConnectInputSchema,
+  feishuWatchInputSchema,
   groupCreateInputSchema,
   groupInviteInputSchema,
   groupLeaveInputSchema,
@@ -18,6 +19,7 @@ import {
   contactRespond,
   decideApproval,
   disconnectFeishuWebhook,
+  feishuWatchView,
   groupCreateFromAgent,
   groupInviteFromAgent,
   groupLeaveFromAgent,
@@ -25,6 +27,7 @@ import {
   listApprovals,
   type MailboxScope,
   pendingRequests,
+  setFeishuWatchTerms,
 } from '@agentdrop/domain';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { type AppContext, dashboardLink } from '../context.js';
@@ -89,6 +92,18 @@ export async function hManageRoutes(app: FastifyInstance, ctx: AppContext): Prom
   app.delete('/v1/h/feishu', async (req) =>
     withTx(ctx.db, (tx) => disconnectFeishuWebhook(tx, scopeOf(req).userId, 'agent')),
   );
+
+  // `agentdrop settings --feishu-watch`: the watch terms for updates from Feishu groups (ADR 0041).
+  app.get('/v1/h/feishu-watch', async (req) =>
+    withTx(ctx.db, (tx) => feishuWatchView(tx, scopeOf(req).userId, ctx.feishuApp?.appId ?? null)),
+  );
+  app.put('/v1/h/feishu-watch', async (req) => {
+    const body = parse(feishuWatchInputSchema, req.body);
+    return withTx(ctx.db, async (tx) => {
+      await setFeishuWatchTerms(tx, scopeOf(req).userId, body.terms, 'agent');
+      return feishuWatchView(tx, scopeOf(req).userId, ctx.feishuApp?.appId ?? null);
+    });
+  });
 
   // Terminal command only (no MCP tool). The confirmation is the person's, obtained before `confirm: true`.
   app.post('/v1/h/contacts/remove', async (req) => {

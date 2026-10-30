@@ -41,6 +41,10 @@ export const LIMITS = {
   HANDLE_MIN: 3,
   HANDLE_MAX: 32,
   REQUEST_ID_MAX: 128,
+  /** Watch terms for updates from Feishu groups (ADR 0041): how many a person keeps, and the length of each. */
+  FEISHU_WATCH_TERMS_MAX: 30,
+  FEISHU_WATCH_TERM_MIN_CHARS: 2,
+  FEISHU_WATCH_TERM_MAX_CHARS: 64,
 } as const;
 
 /** Bytes of a string encoded as UTF-8. */

@@ -12,6 +12,7 @@ import {
   type EventsInput,
   type EventsResult,
   type ExportInput,
+  type FeishuWatchView,
   type groupCreateInputSchema,
   type groupInviteInputSchema,
   type groupLeaveInputSchema,
@@ -402,6 +403,14 @@ export class ApiClient {
   }
   disconnectFeishu(): Promise<FeishuStatus> {
     return this.request('DELETE', '/v1/h/feishu');
+  }
+  /** Watch terms for updates bots post in Feishu groups (ADR 0041). Needs the manage scope. */
+  feishuWatch(): Promise<FeishuWatchView> {
+    return this.request('GET', '/v1/h/feishu-watch');
+  }
+  /** Replaces the whole list; an empty list turns the updates off. */
+  setFeishuWatch(terms: string[]): Promise<FeishuWatchView> {
+    return this.request('PUT', '/v1/h/feishu-watch', { body: { terms } });
   }
   /** Without `confirm` this only describes the contacts; with it, they are removed. */
   contactRemove(input: { handles: string[]; confirm: boolean }): Promise<ContactRemoveResult> {

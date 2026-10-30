@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { groupIdSchema, hIdSchema, userIdSchema } from './drop.js';
-import { LIMITS } from './limits.js';
+import { hasNoControlChars, LIMITS } from './limits.js';
 import { displayNameSchema, groupSlugSchema, publicEmailFieldSchema } from './names.js';
 
 const handleInputSchema = z.string().min(1).max(64);
@@ -132,8 +132,34 @@ export const feishuAppViewSchema = z.object({
   /** Opens the direct chat with the app's bot in the Feishu client; null when no app is configured. */
   bot_link: z.string().nullable(),
   linked_at: z.iso.datetime().nullable(),
+  /** Words that pick the updates bots post in this person's Feishu groups (ADR 0041); kept when unlinked. */
+  watch_terms: z.array(z.string()),
 });
 export type FeishuAppView = z.infer<typeof feishuAppViewSchema>;
+
+/** One watch term: a repository, directory, ticket prefix or name, matched case-insensitively (ADR 0041). */
+export const feishuWatchTermSchema = z
+  .string()
+  .trim()
+  .min(LIMITS.FEISHU_WATCH_TERM_MIN_CHARS)
+  .max(LIMITS.FEISHU_WATCH_TERM_MAX_CHARS)
+  .refine(hasNoControlChars, 'watch terms cannot contain control characters');
+
+/** Replaces the whole list; an empty list turns the updates off. Duplicates (ignoring case) are kept once. */
+export const feishuWatchInputSchema = z
+  .object({ terms: z.array(feishuWatchTermSchema).max(LIMITS.FEISHU_WATCH_TERMS_MAX) })
+  .strict();
+export type FeishuWatchInput = z.infer<typeof feishuWatchInputSchema>;
+
+/** What `agentdrop settings --feishu-watch` gets back: the terms, and whether they can match anything yet. */
+export const feishuWatchViewSchema = z.object({
+  terms: z.array(z.string()),
+  /** The server has a Feishu app (without one, nothing is ever matched). */
+  available: z.boolean(),
+  /** This person's Feishu account is linked to it (ADR 0039); updates need the link. */
+  linked: z.boolean(),
+});
+export type FeishuWatchView = z.infer<typeof feishuWatchViewSchema>;
 
 export const feishuLinkCodeInputSchema = z
   .object({

@@ -12,7 +12,12 @@ import { attachmentMetaSchema, dropIdSchema, hIdSchema, userIdSchema, viewerSche
 import { apiErrorSchema } from './errors.js';
 import { eventsInputSchema, eventsResultSchema, wellKnownSchema } from './events.js';
 import { exportInputSchema } from './export.js';
-import { feishuAppViewSchema, feishuLinkCodeInputSchema, feishuLinkCodeSchema } from './manage.js';
+import {
+  feishuAppViewSchema,
+  feishuLinkCodeInputSchema,
+  feishuLinkCodeSchema,
+  feishuWatchInputSchema,
+} from './manage.js';
 import { displayNameSchema, harnessKeySchema } from './names.js';
 import {
   pushSettingsSchema,
@@ -478,6 +483,15 @@ export const USER_ROUTES = {
     path: '/v1/me/feishu-app',
     auth: 'user_session',
     summary: 'Unlink the Feishu account; notices go back to the group bot, if any',
+    response: feishuAppViewSchema,
+  },
+  feishuAppWatch: {
+    method: 'PUT',
+    path: '/v1/me/feishu-app/watch',
+    auth: 'user_session',
+    summary:
+      'Replace the watch terms that pick, from what bots post in Feishu groups the person is in, the updates sent to them (ADR 0041)',
+    body: feishuWatchInputSchema,
     response: feishuAppViewSchema,
   },
 } as const satisfies Record<string, RouteContract>;

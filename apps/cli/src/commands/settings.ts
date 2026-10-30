@@ -1,3 +1,4 @@
+import type { FeishuWatchView } from '@agentdrop/contracts';
 import { formatInterval, parseInterval, readHookSettings, writeHookSettings } from '../hook-settings.js';
 import { isLanguage, readLanguage, writeLanguage } from '../locale.js';
 import type { Output } from '../output.js';
@@ -13,6 +14,7 @@ export interface SettingsOptions {
   language?: string;
   feishuWebhook?: string;
   feishuSecret?: string;
+  feishuWatch?: string;
   profile?: string;
 }
 /** English twin of `formatInterval` (which writes Chinese) for the summary below. */
@@ -53,7 +55,15 @@ export async function settingsCommand(out: Output, opts: SettingsOptions): Promi
     writeLanguage(opts.language);
   }
   const feishuNote = opts.feishuWebhook === undefined ? null : await applyFeishu(opts);
-  const { language: _language, feishuWebhook: _f, feishuSecret: _s, profile: _p, ...hookOptions } = opts;
+  const watch = opts.feishuWatch === undefined ? null : await applyFeishuWatch(opts);
+  const {
+    language: _language,
+    feishuWebhook: _f,
+    feishuSecret: _s,
+    feishuWatch: _w,
+    profile: _p,
+    ...hookOptions
+  } = opts;
   if (Object.values(hookOptions).some((v) => v !== undefined)) writeHookSettings(settings);
   const language = readLanguage();
   const zh = language === 'zh';
@@ -62,9 +72,10 @@ export async function settingsCommand(out: Output, opts: SettingsOptions): Promi
   const updateInterval = every(settings.updates.interval_ms);
   const n = settings.notifications;
   const u = settings.updates;
-  out.result({ ...settings, language }, () =>
+  out.result({ ...settings, language, ...(watch ? { feishu_watch: watch.view } : {}) }, () =>
     [
       ...(feishuNote ? [feishuNote] : []),
+      ...(watch ? [watch.note] : []),
       zh ? '通知语言：中文' : 'Notice language: English (agentdrop settings --language zh for Chinese)',
       zh
         ? `Hook 通知：${n.enabled ? '开启' : '关闭'}；最短提醒间隔：${interval}`
@@ -82,17 +93,65 @@ export async function settingsCommand(out: Output, opts: SettingsOptions): Promi
   );
 }
 
+function profileFor(opts: SettingsOptions, what: string): string {
+  const profiles = listProfiles();
+  const profile = opts.profile ?? (profiles.length === 1 ? profiles[0]?.profile : undefined);
+  if (!profile) throw new Error(`several profiles here: add --profile <name> to say whose ${what}`);
+  return profile;
+}
+
+/**
+ * `--feishu-watch a,b,c` replaces the watch terms that pick, out of what bots post in the person's Feishu groups, the
+ * updates sent to them (ADR 0041); `show` prints them, `off` clears them. Terms are the person's own words: an agent
+ * runs this only with terms the person gave.
+ */
+async function applyFeishuWatch(opts: SettingsOptions): Promise<{ view: FeishuWatchView; note: string }> {
+  const { client } = clientFor(profileFor(opts, 'watch terms these are'));
+  const zh = readLanguage() === 'zh';
+  const raw = (opts.feishuWatch ?? '').trim();
+  const view =
+    raw === 'show'
+      ? await client.feishuWatch()
+      : await client.setFeishuWatch(
+          raw === 'off'
+            ? []
+            : raw
+                .split(/[,，、\n]/)
+                .map((t) => t.trim())
+                .filter((t) => t.length > 0),
+        );
+  const list = view.terms.join(zh ? '、' : ', ');
+  const lines = [
+    view.terms.length === 0
+      ? zh
+        ? '飞书动态关注词：无（不会收到群里机器人发的更新）。'
+        : 'Feishu watch terms: none (no updates from bots in Feishu groups).'
+      : zh
+        ? `飞书动态关注词（${view.terms.length} 个）：${list}`
+        : `Feishu watch terms (${view.terms.length}): ${list}`,
+  ];
+  if (view.terms.length > 0 && !view.available)
+    lines.push(
+      zh
+        ? '这台服务器没有配置飞书应用，关注词暂时不会匹配到任何东西。'
+        : 'This server has no Feishu app, so the terms match nothing for now.',
+    );
+  else if (view.terms.length > 0 && !view.linked)
+    lines.push(
+      zh
+        ? '还没绑定飞书账号：在 AgentDrop 网页「设置 → 飞书」绑定后才会收到；还要把 AgentDrop 机器人拉进有更新的群。'
+        : 'Feishu is not linked yet: link it in AgentDrop, Settings → Feishu, and add the AgentDrop bot to the groups with the updates.',
+    );
+  return { view, note: lines.join('\n') };
+}
+
 /**
  * `--feishu-webhook <address>` connects this account's notices to a Feishu group bot (the server sends a test
  * message first and refuses an address Feishu does not accept); `--feishu-webhook off` disconnects it. Needs the
  * profile whose account it is; with a single profile on this machine it is picked automatically.
  */
 async function applyFeishu(opts: SettingsOptions): Promise<string> {
-  const profiles = listProfiles();
-  const profile = opts.profile ?? (profiles.length === 1 ? profiles[0]?.profile : undefined);
-  if (!profile)
-    throw new Error('several profiles here: add --profile <name> to say whose notices go to Feishu');
-  const { client } = clientFor(profile);
+  const { client } = clientFor(profileFor(opts, 'notices go to Feishu'));
   const zh = readLanguage() === 'zh';
   if (opts.feishuWebhook === 'off') {
     await client.disconnectFeishu();

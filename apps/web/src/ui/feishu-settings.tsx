@@ -1,13 +1,13 @@
 import type { FeishuAppView, FeishuLinkCode } from '@agentdrop/contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { MessageCircle, MessagesSquare } from 'lucide-react';
-import { useState } from 'react';
+import { GitPullRequest, MessageCircle, MessagesSquare } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
 import { formatDateTime } from '../lib/format.js';
 import { useLang, useT } from '../lib/lang.js';
 import { useSession } from '../lib/session.js';
 import { Chip, Panel } from './layout.jsx';
-import { Button, ErrorBox, Field, Input } from './primitives.jsx';
+import { Button, ErrorBox, Field, Input, Textarea } from './primitives.jsx';
 import { TitleWithChip } from './settings-controls.jsx';
 
 /**
@@ -238,6 +238,90 @@ export function FeishuAppCard() {
         )}
         {getCode.isError ? <ErrorBox error={getCode.error} /> : null}
         {unlink.isError ? <ErrorBox error={unlink.error} /> : null}
+      </Panel>
+    </div>
+  );
+}
+
+/** Terms as the person typed them: one per line or separated by commas; empty pieces dropped. */
+export function splitWatchTerms(text: string): string[] {
+  return text
+    .split(/[\n,，、]/)
+    .map((term) => term.trim())
+    .filter((term) => term.length > 0);
+}
+
+/**
+ * Watch terms (ADR 0041): when a bot posts in a Feishu group the person is in and the AgentDrop bot was added to,
+ * a message containing one of these words reaches them at once as a direct message from the AgentDrop assistant.
+ * Shown only when the server has a Feishu app; the terms are kept while Feishu is not linked.
+ */
+export function FeishuWatchCard() {
+  const t = useT();
+  const qc = useQueryClient();
+  const view = useQuery({
+    queryKey: FEISHU_APP_KEY,
+    queryFn: () => api.get<FeishuAppView>('/v1/me/feishu-app'),
+  });
+  const saved = (view.data?.watch_terms ?? []).join('\n');
+  const [text, setText] = useState(saved);
+  useEffect(() => setText(saved), [saved]);
+  const save = useMutation({
+    mutationFn: () => api.put<FeishuAppView>('/v1/me/feishu-app/watch', { terms: splitWatchTerms(text) }),
+    onSuccess: (v) => qc.setQueryData(FEISHU_APP_KEY, v),
+  });
+  if (!view.data?.available) return null;
+  const count = view.data.watch_terms.length;
+  const changed = splitWatchTerms(text).join('\n') !== saved;
+  return (
+    <div id="feishu-watch">
+      <Panel
+        icon={<GitPullRequest size={16} />}
+        title={
+          <TitleWithChip
+            chip={count > 0 ? <Chip tone="ok">{t(`${count} watched`, `关注 ${count} 个`)}</Chip> : null}
+          >
+            {t('Updates from Feishu groups', '飞书群动态')}
+          </TitleWithChip>
+        }
+        description={t(
+          'When a bot posts in one of your Feishu groups (pull requests, CI, releases) and the message contains one of your watch terms, it reaches you at once as a message from the AgentDrop assistant. Add the AgentDrop bot to those groups first.',
+          '你所在的飞书群里，机器人发的消息（PR、CI、发版等）只要包含下面任一关注词，就会立刻以 AgentDrop 助手的消息推给你。先把 AgentDrop 机器人拉进这些群。',
+        )}
+      >
+        {!view.data.linked ? (
+          <p className="text-sm text-muted">
+            {t(
+              'Link your Feishu account above first; until then nothing is matched.',
+              '先在上面绑定飞书账号，绑定之前不会匹配任何消息。',
+            )}
+          </p>
+        ) : null}
+        <Field
+          label={t(
+            'Watch terms: one per line or separated by commas (repository, directory, ticket prefix, your name)',
+            '关注词：每行一个或用逗号分隔（仓库名、目录、单号前缀、你的名字）',
+          )}
+        >
+          <Textarea
+            rows={4}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder={'agentdrop\napps/worker\nPAPER-'}
+          />
+        </Field>
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-xs text-muted">
+            {t(
+              'Matching ignores case. Up to 30 terms, 2–64 characters each; at most 30 updates an hour.',
+              '不区分大小写。最多 30 个，每个 2–64 个字符；每小时最多推 30 条。',
+            )}
+          </span>
+          <Button disabled={!changed || save.isPending} onClick={() => save.mutate()}>
+            {save.isPending ? t('Saving…', '正在保存…') : t('Save watch terms', '保存关注词')}
+          </Button>
+        </div>
+        {save.isError ? <ErrorBox error={save.error} /> : null}
       </Panel>
     </div>
   );

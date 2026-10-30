@@ -50,6 +50,12 @@ Releases up to 0.4.12 predate this file.
 
 ### Added
 
+- Updates from Feishu groups (ADR 0041): when the server's Feishu app is in a group where bots post repository
+  updates, each bot message containing one of a member's watch terms reaches that member at once as a direct
+  message from the AgentDrop assistant. Watch terms are set in Settings → Feishu or with
+  `agentdrop settings --feishu-watch`; only linked members of that group receive it, people's own messages in the
+  group are never read, and the app needs two more scopes and one more event (docs/FEISHU.md §11).
+
 - Feishu cards from the server's own Feishu app (ADR 0039, docs/FEISHU.md §10): with `FEISHU_APP_ID` and
   `FEISHU_APP_SECRET` set, Settings → Notifications offers "Feishu account". The person gets a one-time code and
   sends it to the app's bot; notices then arrive as cards in that chat, with "Mark read", "Star" and "Open in

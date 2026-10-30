@@ -4,6 +4,7 @@ import {
   displayNameSchema,
   feishuConnectInputSchema,
   feishuLinkCodeInputSchema,
+  feishuWatchInputSchema,
   pairingDecisionInputSchema,
   pushSubscriptionInputSchema,
   z,
@@ -37,6 +38,7 @@ import {
   setDefaultReceivingEndpoint,
   setDirectReceiveAll,
   setEndpointPublicName,
+  setFeishuWatchTerms,
   setNotificationWebhook,
   setPublicEmail,
   signInEmailOf,
@@ -162,6 +164,16 @@ export async function meRoutes(app: FastifyInstance, ctx: AppContext): Promise<v
     const p = userPrincipalOf(req);
     return withTx(ctx.db, async (tx) => {
       await unlinkFeishuAccount(tx, p.userId);
+      return feishuAppView(tx, p.userId, ctx.feishuApp ?? null);
+    });
+  });
+
+  // Watch terms for updates bots post in Feishu groups (ADR 0041). Kept even while Feishu is not linked.
+  app.put('/v1/me/feishu-app/watch', async (req) => {
+    const p = userPrincipalOf(req);
+    const body = parse(feishuWatchInputSchema, req.body);
+    return withTx(ctx.db, async (tx) => {
+      await setFeishuWatchTerms(tx, p.userId, body.terms, 'dashboard');
       return feishuAppView(tx, p.userId, ctx.feishuApp ?? null);
     });
   });

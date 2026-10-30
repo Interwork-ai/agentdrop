@@ -47,3 +47,4 @@ record and set the old one's status to `Superseded by NNNN`. Link the record fro
 | [0038](0038-reply-progress.md) | A reply can say where the asked-for work stands | Accepted |
 | [0039](0039-feishu-app-cards.md) | Feishu notices as cards from the server's own Feishu app, to a linked account | Accepted |
 | [0040](0040-resumable-per-person-event-stream.md) | Events are hints: a resumable per-person event stream | Accepted |
+| [0041](0041-feishu-group-updates-by-watch-terms.md) | Updates that bots post in Feishu groups, pushed to the members who watch for them | Accepted |

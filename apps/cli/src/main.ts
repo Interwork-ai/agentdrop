@@ -714,7 +714,14 @@ export function buildProgram(): Command {
       'send notices to a Feishu group bot (its webhook address), or off',
     )
     .option('--feishu-secret <secret>', 'signature secret, if the bot has signature verification on')
-    .option('--profile <name>', 'whose account (needed for --feishu-webhook when there are several profiles)')
+    .option(
+      '--feishu-watch <terms|show|off>',
+      'watch terms (comma-separated) picking updates that bots post in your Feishu groups; show; or off',
+    )
+    .option(
+      '--profile <name>',
+      'whose account (needed for --feishu-webhook or --feishu-watch when there are several profiles)',
+    )
     .action((o: SettingsOptions) => settingsCommand(out(), o));
 
   program

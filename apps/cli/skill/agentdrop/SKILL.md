@@ -209,6 +209,7 @@ showed it, mark it read.
 Never include tokens, credentials, or unrelated private paths in a handoff.
 
 See [workflows](reference/workflows.md) for argument examples, [groups](reference/groups.md) for the group rules,
-[feishu](reference/feishu.md) when the user wants notices in Feishu/Lark (飞书) or is setting up with lark-cli installed,
+[feishu](reference/feishu.md) when the user wants notices in Feishu/Lark (飞书), is setting up with lark-cli installed,
+or wants updates that bots post in their Feishu groups (watch terms),
 and [troubleshooting](reference/troubleshooting.md) for error handling. These references apply across supported
 harnesses; use only capabilities registered in the current toolset.

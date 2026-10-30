@@ -192,6 +192,7 @@ describeDb('Feishu notices as cards from the server’s own app (ADR 0039)', () 
       linked: false,
       bot_link: null,
       linked_at: null,
+      watch_terms: [],
     });
     const before = await t.app.inject({
       method: 'GET',

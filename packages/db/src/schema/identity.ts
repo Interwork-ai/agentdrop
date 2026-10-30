@@ -58,6 +58,8 @@ export const appUsers = pgTable(
       secret: string | null;
       language: 'en' | 'zh';
     }>(),
+    /** Words that pick, out of what bots post in Feishu groups this person is in, the updates sent to them (ADR 0041). */
+    feishuWatchTerms: text('feishu_watch_terms').array().notNull().default(sql`'{}'::text[]`),
     /** Set by an admin: every session and agent credential of this account stops working while it is set. */
     suspendedAt: ts('suspended_at'),
     suspendedReason: text('suspended_reason'),
