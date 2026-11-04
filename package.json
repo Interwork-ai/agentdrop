@@ -39,8 +39,8 @@
     "build:server": "tsc -b apps/api apps/worker && pnpm --filter @agentdrop/web typecheck && pnpm --filter @agentdrop/web build"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.5.15",
-    "@modelcontextprotocol/client": "2.3.1",
+    "@biomejs/biome": "2.6.3",
+    "@modelcontextprotocol/client": "2.4.0",
     "@types/node": "22.20.5",
     "playwright-core": "1.64.1",
     "rimraf": "6.1.3",
