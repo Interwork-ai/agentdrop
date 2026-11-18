@@ -18,11 +18,11 @@
     "@agentdrop/contracts": "workspace:*",
     "@agentdrop/mcp": "workspace:*",
     "@agentdrop/security": "workspace:*",
-    "@modelcontextprotocol/client": "2.3.1",
-    "commander": "15.0.0",
+    "@modelcontextprotocol/client": "2.4.0",
+    "commander": "15.1.0",
     "jsonc-parser": "3.3.1",
     "smol-toml": "1.9.1",
-    "undici": "8.12.3",
+    "undici": "8.12.4",
     "zod": "4.6.7"
   },
   "files": [
